@@ -1,0 +1,29 @@
+
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <script>
+        // Opening a Vite entry file directly cannot load its TypeScript modules.
+        // Send local file launches to the development server instead.
+        if (window.location.protocol === "file:") {
+          window.location.replace("http://localhost:5173/Dashboard/");
+        }
+      </script>
+      
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Build responsive product UI</title>
+      <meta name="description" content="Delivers a cohesive, responsive UI with a scalable design system for managing products, orders, users, and settings in a modern platform." />
+      <meta name="robots" content="noindex, nofollow" />
+      <link rel="icon" type="image/png" href="/favicon.png" />
+      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
+      
+    </head>
+
+    <body>
+      
+      <div id="root"></div>
+      <script type="module" src="/src/main.tsx"></script>
+      
+    </body>
+  </html>
