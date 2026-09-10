@@ -460,57 +460,38 @@ function NavItem({
   item,
   isPinned,
   isActive,
-  section,
   hoveredItem,
   openMenu,
-  dragItemRef,
-  dragOverItemRef,
   onNavigate,
   onHover,
   onOpenMenu,
   onPin,
-  onDrop,
 }: {
   item: MenuItem;
   isPinned: boolean;
   isActive: boolean;
-  section: "fav" | "main";
   hoveredItem: string | null;
   openMenu: string | null;
-  dragItemRef: React.MutableRefObject<{ label: string; section: "fav" | "main" } | null>;
-  dragOverItemRef: React.MutableRefObject<{ label: string; section: "fav" | "main" } | null>;
   onNavigate: (p: Page) => void;
   onHover: (label: string | null) => void;
   onOpenMenu: (label: string | null) => void;
   onPin: (item: MenuItem, isPinned: boolean) => void;
-  onDrop: () => void;
 }) {
   const { icon: Icon, label, page } = item;
   const isHovered = hoveredItem === label;
   const menuOpen = openMenu === label;
-  const [isDragOver, setIsDragOver] = useState(false);
   const { cartItemCount, cart503BItemCount } = useCartSummary();
-  const badgeCount = label === "Orders" ? ORDERS.length : label === "Cart" ? cartItemCount : label === "503B Cart" ? cart503BItemCount : null;
+  const badgeCount = page === "orders" ? ORDERS.length : page === "cart-multi" ? cartItemCount : page === "cart-503b" ? cart503BItemCount : null;
 
   return (
     <div
       className="relative"
-      draggable
-      onDragStart={() => { dragItemRef.current = { label, section }; }}
-      onDragEnter={() => { dragOverItemRef.current = { label, section }; setIsDragOver(true); }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={() => { setIsDragOver(false); onDrop(); }}
-      onDragEnd={() => { dragItemRef.current = null; dragOverItemRef.current = null; setIsDragOver(false); }}
       onMouseEnter={() => onHover(label)}
       onMouseLeave={() => onHover(null)}
     >
-      {isDragOver && (
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-[#183229] rounded-full -translate-y-px" />
-      )}
       <div
-        className={`group flex h-10 w-full cursor-grab select-none items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-normal text-[#242424] transition-colors active:cursor-grabbing ${
-          isActive ? "bg-[#F2F3F4] text-[#171717]" : isDragOver ? "bg-[#F6F7F7]" : "hover:bg-[#F6F6F5]"
+        className={`group flex h-10 w-full cursor-pointer select-none items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-normal text-[#242424] transition-colors ${
+          isActive ? "bg-[#F2F3F4] text-[#171717]" : "hover:bg-[#F6F6F5]"
         }`}
         onClick={() => {
           if (label === "Hard Refresh") {
@@ -522,7 +503,10 @@ function NavItem({
         }}
       >
         <Icon size={16} strokeWidth={1.65} className="flex-shrink-0 text-[#303332] transition-transform duration-200 ease-out group-hover:-translate-y-px group-hover:translate-x-0.5 group-hover:rotate-6" />
-        <span className="flex-1">{label}</span>
+        <span className="flex flex-1 items-center gap-2">
+          {page === "cart-503b" ? "Cart" : label}
+          {page === "cart-503b" && <span className="rounded-full bg-[#eef3ff] px-2 py-1 text-[10px] font-semibold leading-none text-[#2563EB]">503B</span>}
+        </span>
         {badgeCount !== null && badgeCount > 0 ? <span className="inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#e9eaec] px-1.5 text-[10px] font-semibold tabular-nums text-[#35383a]">{badgeCount}</span> : <span className="size-6 flex-shrink-0" />}
       </div>
     </div>
@@ -562,8 +546,6 @@ function Sidebar({
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [canScrollMainMenu, setCanScrollMainMenu] = useState(false);
   const menuScrollRef = useRef<HTMLDivElement>(null);
-  const dragItem = useRef<{ label: string; section: "fav" | "main" } | null>(null);
-  const dragOverItem = useRef<{ label: string; section: "fav" | "main" } | null>(null);
 
   function handlePin(item: MenuItem, isPinned: boolean) {
     if (isPinned) {
@@ -576,40 +558,14 @@ function Sidebar({
     setOpenMenu(null);
   }
 
-  function handleDrop() {
-    const from = dragItem.current;
-    const to = dragOverItem.current;
-    if (!from || !to || from.label === to.label) return;
-
-    const reorder = (list: MenuItem[], fromLabel: string, toLabel: string) => {
-      const arr = [...list];
-      const fromIdx = arr.findIndex((i) => i.label === fromLabel);
-      const toIdx = arr.findIndex((i) => i.label === toLabel);
-      if (fromIdx === -1 || toIdx === -1) return arr;
-      const [moved] = arr.splice(fromIdx, 1);
-      arr.splice(toIdx, 0, moved);
-      return arr;
-    };
-
-    if (from.section === "fav" && to.section === "fav") {
-      setFavorites((prev) => reorder(prev, from.label, to.label));
-    } else if (from.section === "main" && to.section === "main") {
-      setMainMenu((prev) => reorder(prev, from.label, to.label));
-    }
-
-    dragItem.current = null;
-    dragOverItem.current = null;
-  }
-
   const handleNavigate = (nextPage: Page) => {
     onNavigate(nextPage === "cart-multi" ? cartPage : nextPage);
   };
 
   const navItemProps = {
     hoveredItem, openMenu,
-    dragItemRef: dragItem, dragOverItemRef: dragOverItem,
     onNavigate: handleNavigate, onHover: setHoveredItem, onOpenMenu: setOpenMenu,
-    onPin: handlePin, onDrop: handleDrop,
+    onPin: handlePin,
   };
 
   useEffect(() => {
@@ -668,7 +624,7 @@ function Sidebar({
         <div className="flex flex-col gap-0.5">
           {mainMenu.map((item) => {
             const isActive = item.page === "cart-multi" ? active === cartPage : item.page === "orders" ? active === "orders" || active === "order-detail" : active === item.page && item.label !== "Hard Refresh";
-            return <NavItem key={item.label} item={item} isPinned={false} isActive={isActive} section="main" {...navItemProps} />;
+            return <NavItem key={item.label} item={item} isPinned={false} isActive={isActive} {...navItemProps} />;
           })}
         </div>
       </div>
@@ -878,197 +834,6 @@ function UserChip({
           </span>
         </button>
       </div>
-    </div>
-  );
-}
-
-function HeaderActions({
-  onNavigate,
-  cartPage = "cart-single",
-  favoriteProducts,
-  onProductSelect,
-}: {
-  onNavigate: (p: Page) => void;
-  cartPage?: Page;
-  favoriteProducts?: CardDef[];
-  onProductSelect?: (product: CardDef) => void;
-}) {
-  const [cartOpen, setCartOpen] = useState<CartScope | null>(null);
-  const [favoritesOpen, setFavoritesOpen] = useState(false);
-  const { cartPreviewItems: allCartPreviewItems, updateCartItemQty, removeCartItem, clearCartItems } = useCartSummary();
-  const sharedFavorites = useProductFavorites();
-  const products = favoriteProducts ?? sharedFavorites.favoriteProducts;
-  const favoriteCount = products.length;
-  return (
-    <div className="flex items-center gap-5">
-      {(["standard", "503B"] as const).map(scope => {
-        const cartPreviewItems = allCartPreviewItems.filter(item => cartScope(item) === scope);
-        const cartItemCount = cartPreviewItems.reduce((sum, item) => sum + (item.qty ?? 1), 0);
-        const cartSubtotal = cartPreviewItems.reduce((sum, item) => sum + (Number.parseFloat(item.price.replace(/[^0-9.]/g, "")) || 0) * (item.qty ?? 1), 0);
-        return (
-      <div key={scope} className="relative">
-        <button
-          onClick={() => {
-            setCartOpen(open => open === scope ? null : scope);
-            setFavoritesOpen(false);
-          }}
-          className="relative flex items-center gap-1.5 text-[13px] font-medium text-[#1a1a1a] transition-opacity hover:opacity-70"
-          aria-expanded={cartOpen === scope}
-        >
-          <span className="relative">
-            <ShoppingCart size={17} strokeWidth={1.5} />
-            {cartItemCount > 0 && (
-              <span className="absolute -right-2.5 -top-2 flex size-4 items-center justify-center rounded-full bg-[#183229] text-[9px] font-bold text-white">
-                {cartItemCount}
-              </span>
-            )}
-          </span>
-          {scope === "503B" ? "503B Cart" : "Cart"}
-        </button>
-
-        {cartOpen === scope && (
-          <div className="absolute right-0 top-8 z-50 w-[340px] overflow-hidden rounded-[6px] border border-[#e8e3df] bg-white shadow-[0_18px_45px_rgba(24,50,41,0.18)]">
-            <div className="flex h-12 items-center justify-between border-b border-[#eee8e3] px-4">
-              <p className="text-[14px] font-medium text-[#6f7782]">{cartItemCount} product{cartItemCount === 1 ? "" : "s"}</p>
-              {cartPreviewItems.length > 0 ? (
-                <button onClick={() => clearCartItems(scope)} className="text-[13px] font-semibold text-[#183229] transition-opacity hover:opacity-70">
-                  Clear all
-                </button>
-              ) : (
-                <ShoppingCart size={16} className="text-[#183229]" />
-              )}
-            </div>
-            <div className="max-h-[260px] overflow-y-auto px-3 py-2">
-              {cartPreviewItems.length > 0 ? (
-                cartPreviewItems.map(item => (
-                  <div key={`${item.id}-${item.name}`} className="group grid grid-cols-[46px_minmax(0,1fr)_28px] items-start gap-3 rounded-[7px] px-1.5 py-3 transition-colors hover:bg-[var(--app-soft-hover)]">
-                    <span className="flex size-11 items-center justify-center overflow-hidden rounded-[8px] bg-[#fbfaf8]">
-                      <img src={item.img} alt="" className="h-9 w-10 object-contain mix-blend-multiply" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-semibold text-[#1a1a1a]">{item.name}</span>
-                      <span className="mt-1 block truncate text-[12px] text-[#6f7782]">
-                        Price per unit: <strong className="font-bold text-[#1a1a1a]">{item.price}</strong>
-                      </span>
-                      <span className="mt-2 inline-flex h-7 items-center overflow-hidden rounded-full border border-[#d8dfdc] bg-white">
-                        <button onClick={() => updateCartItemQty(item.id, -1, scope, true)} className="flex size-7 items-center justify-center text-[#6f7782] hover:bg-[#eef5f1]" aria-label={`Decrease ${item.name}`}>
-                          <Minus size={12} />
-                        </button>
-                        <span className="flex h-7 min-w-7 items-center justify-center px-1 text-[12px] font-semibold text-[#1a1a1a]">{item.qty ?? 1}</span>
-                        <button onClick={() => updateCartItemQty(item.id, 1, scope, true)} className="flex size-7 items-center justify-center text-[#183229] hover:bg-[#eef5f1]" aria-label={`Increase ${item.name}`}>
-                          <Plus size={12} />
-                        </button>
-                      </span>
-                    </span>
-                    <button onClick={() => removeCartItem(item.id, scope)} className="flex size-7 items-center justify-center rounded-[6px] text-[#d92d20] opacity-0 transition-all hover:bg-[#fbeaea] group-hover:opacity-100" aria-label={`Remove ${item.name}`}>
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="px-4 py-8 text-center">
-                  <ShoppingCart size={22} className="mx-auto text-[#c7cfcb]" />
-                  <p className="mt-2 text-[12px] font-semibold text-[#1a1a1a]">Your cart is empty</p>
-                  <p className="mt-1 text-[11px] text-[#6f7782]">Add products to see them here.</p>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-[#eee8e3] px-3 py-3">
-              <button
-                onClick={() => {
-                  setCartOpen(null);
-                  onNavigate(scope === "503B" ? "cart-503b" : cartPage);
-                }}
-                className="flex h-10 w-full items-center justify-center rounded-[10px] bg-[#183229] text-[12px] font-bold uppercase tracking-[0.02em] text-white transition-colors hover:bg-[#244438]"
-              >
-                Go to cart{cartSubtotal > 0 ? ` ($${cartSubtotal.toFixed(2)})` : ""}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-        );
-      })}
-
-      <div className="relative">
-        <button
-          onClick={() => {
-            setFavoritesOpen(open => !open);
-            setCartOpen(null);
-          }}
-          className="relative flex items-center gap-1.5 text-[13px] font-medium text-[#1a1a1a] transition-opacity hover:opacity-70"
-          aria-expanded={favoritesOpen}
-        >
-          <span className="relative">
-            <Heart size={17} strokeWidth={1.5} />
-            {favoriteCount > 0 && (
-              <span className="absolute -right-2.5 -top-2 flex size-4 items-center justify-center rounded-full bg-[#183229] text-[9px] font-bold text-white">
-                {favoriteCount}
-              </span>
-            )}
-          </span>
-          Favorites
-        </button>
-
-        {favoritesOpen && (
-          <div className="absolute right-0 top-8 z-50 w-[360px] overflow-hidden rounded-[6px] border border-[#e8e3df] bg-white shadow-[0_18px_45px_rgba(24,50,41,0.18)]">
-            <div className="flex h-12 items-center justify-between border-b border-[#eee8e3] px-4">
-              <p className="text-[14px] font-medium text-[#6f7782]">{favoriteCount} product{favoriteCount === 1 ? "" : "s"}</p>
-              <button
-                onClick={() => sharedFavorites.setFavoriteProductIds(new Set())}
-                className="text-[13px] font-semibold text-[#183229] transition-opacity hover:opacity-70"
-              >
-                Clear all
-              </button>
-            </div>
-
-            <div className="max-h-[260px] overflow-y-auto px-3 py-2">
-              {products.length > 0 ? (
-                products.map(product => (
-                  <button
-                    key={product.id}
-                    onClick={() => {
-                      onProductSelect?.(product);
-                      setFavoritesOpen(false);
-                      onNavigate("product-detail");
-                    }}
-                    className="grid w-full grid-cols-[42px_minmax(0,1fr)] items-center gap-3 rounded-[6px] px-1 py-2.5 text-left transition-colors hover:bg-[var(--app-soft-hover)]"
-                  >
-                    <span className="flex h-8 w-10 items-center justify-center overflow-hidden bg-[#fbfaf8]">
-                      <img src={product.img} alt="" className="h-8 w-10 object-contain mix-blend-multiply" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-semibold text-[#1a1a1a]">{product.name}</span>
-                      <span className="mt-1 block truncate text-[12px] text-[#6f7782]">
-                        Price per unit: <strong className="font-bold text-[#1a1a1a]">{product.price}</strong>
-                      </span>
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div className="px-4 py-8 text-center">
-                  <Heart size={22} className="mx-auto text-[#c7cfcb]" />
-                  <p className="mt-2 text-[12px] font-semibold text-[#1a1a1a]">No favorites yet</p>
-                  <p className="mt-1 text-[11px] text-[#6f7782]">Save products from the catalog to see them here.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-[#eee8e3] px-3 py-3">
-              <button
-                onClick={() => {
-                  setFavoritesOpen(false);
-                  onNavigate("favorites");
-                }}
-                className="flex h-10 w-full items-center justify-center rounded-[10px] bg-[#183229] text-[12px] font-bold uppercase tracking-[0.02em] text-white transition-colors hover:bg-[#244438]"
-              >
-                Go to Favorites
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }
@@ -9743,6 +9508,9 @@ function MultiPatientCartPage({
           <section className="min-w-0">
             {cartRowsWithNumbers.map(({ patient, item }, rowIndex) => {
               const pharmacy = item.pharmacy ?? cartData.pharmacy;
+              const pharmacyCatalogTypes = (["503A", "503B"] as const).filter(type =>
+                cartRowsWithNumbers.some(row => (row.item.pharmacy ?? cartData.pharmacy) === pharmacy && cartCatalogType(row.item) === type)
+              );
               const isFirstInPharmacy = rowIndex === 0 || (cartRowsWithNumbers[rowIndex - 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
               const isLastInPharmacy = rowIndex === cartRowsWithNumbers.length - 1 || (cartRowsWithNumbers[rowIndex + 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
               const includedSupplies = patient.items.filter(supply => supply.kind === "supply" && !removed.has(supply.id));
@@ -9768,12 +9536,12 @@ function MultiPatientCartPage({
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className={cartCardVariant === 3 ? "text-[13px] font-medium text-[#171717]" : "text-[16px] font-medium text-[#171717]"}>{pharmacy} Cart</h2>
-                          {[...new Set(cartRowsWithNumbers
-                            .filter(row => (row.item.pharmacy ?? cartData.pharmacy) === pharmacy)
-                            .map(row => cartCatalogType(row.item))
-                            .filter(Boolean))].map(catalogType => (
-                            <span key={catalogType} className="rounded-full bg-[#eef3ff] px-2 py-1 text-[10px] font-semibold leading-none text-[#2563EB]">{catalogType}</span>
+                          {pharmacyCatalogTypes.map(type => (
+                            <span key={type} className="shrink-0 rounded-full bg-[#eef3ff] px-2 py-1 text-[10px] font-semibold leading-none text-[#2563EB]">
+                              {type}
+                            </span>
                           ))}
+
                         </div>
                         <div className="flex items-center gap-3">
                           <select
@@ -13013,9 +12781,6 @@ export default function App() {
             <main ref={mainScrollRef} className="app-main-scroll h-screen min-w-0 flex-1 overflow-y-scroll p-3 pl-1.5">
               <div className="bg-card rounded-[10px] min-h-full p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 <div className="w-full max-w-[1400px]">
-                  <div className="mb-5 flex justify-end">
-                    <HeaderActions onNavigate={setPage} cartPage={cartPage} onProductSelect={selectProduct} />
-                  </div>
                   {pageLoading ? <PageContentSkeleton page={page} /> : renderPage()}
                 </div>
               </div>
