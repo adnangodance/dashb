@@ -136,6 +136,7 @@ type Page =
   | "users"
   | "settings"
   | "cart-single"
+  | "cart-503b"
   | "cart-multi"
   | "checkout-prescription";
 
@@ -229,16 +230,21 @@ function useProductFavorites() {
   return context;
 }
 
+type CartScope = "standard" | "503B";
+const cartScope = (item: { catalogType?: "503A" | "503B" }): CartScope => item.catalogType === "503B" ? "503B" : "standard";
+
 type CartSummaryContextValue = {
   cartItemCount: number;
+  cart503BItemCount: number;
   cartPreviewItems: CartPreviewItem[];
   addCartItems: (count?: number, product?: CartPreviewItem) => void;
-  updateCartItemQty: (id: number, delta: number) => void;
-  removeCartItem: (id: number) => void;
-  clearCartItems: () => void;
+  updateCartItemQty: (id: number, delta: number, scope?: CartScope, syncEntries?: boolean) => void;
+  removeCartItem: (id: number, scope?: CartScope) => void;
+  clearCartItems: (scope?: CartScope) => void;
 };
 
 type CartPreviewItem = {
+  catalogType?: "503A" | "503B";
   id: number;
   name: string;
   price: string;
@@ -266,6 +272,7 @@ function useCartSummary() {
   if (!context) {
     return {
       cartItemCount: 0,
+      cart503BItemCount: 0,
       cartPreviewItems: [],
       addCartItems: () => undefined,
       updateCartItemQty: () => undefined,
@@ -444,6 +451,7 @@ const INITIAL_MAIN: MenuItem[] = [
   { icon: History, label: "Order History", page: "order-history" },
   { icon: CheckCircle2, label: "Pending Approvals", page: "pending-approvals" },
   { icon: ShoppingCart, label: "Cart", page: "cart-multi" },
+  { icon: ShoppingCart, label: "503B Cart", page: "cart-503b" },
   { icon: Users, label: "Patients", page: "users" },
   { icon: MessageSquare, label: "Support Tickets", page: "support" },
 ];
@@ -481,8 +489,8 @@ function NavItem({
   const isHovered = hoveredItem === label;
   const menuOpen = openMenu === label;
   const [isDragOver, setIsDragOver] = useState(false);
-  const { cartItemCount } = useCartSummary();
-  const badgeCount = label === "Orders" ? ORDERS.length : label === "Cart" ? cartItemCount : null;
+  const { cartItemCount, cart503BItemCount } = useCartSummary();
+  const badgeCount = label === "Orders" ? ORDERS.length : label === "Cart" ? cartItemCount : label === "503B Cart" ? cart503BItemCount : null;
 
   return (
     <div
@@ -885,27 +893,27 @@ function HeaderActions({
   favoriteProducts?: CardDef[];
   onProductSelect?: (product: CardDef) => void;
 }) {
-  const [cartOpen, setCartOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState<CartScope | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
-  const { cartItemCount, cartPreviewItems, updateCartItemQty, removeCartItem, clearCartItems } = useCartSummary();
+  const { cartPreviewItems: allCartPreviewItems, updateCartItemQty, removeCartItem, clearCartItems } = useCartSummary();
   const sharedFavorites = useProductFavorites();
   const products = favoriteProducts ?? sharedFavorites.favoriteProducts;
   const favoriteCount = products.length;
-  const cartSubtotal = cartPreviewItems.reduce((sum, item) => {
-    const unitPrice = Number.parseFloat(item.price.replace(/[^0-9.]/g, ""));
-    return sum + (Number.isFinite(unitPrice) ? unitPrice * (item.qty ?? 1) : 0);
-  }, 0);
-
   return (
     <div className="flex items-center gap-5">
-      <div className="relative">
+      {(["standard", "503B"] as const).map(scope => {
+        const cartPreviewItems = allCartPreviewItems.filter(item => cartScope(item) === scope);
+        const cartItemCount = cartPreviewItems.reduce((sum, item) => sum + (item.qty ?? 1), 0);
+        const cartSubtotal = cartPreviewItems.reduce((sum, item) => sum + (Number.parseFloat(item.price.replace(/[^0-9.]/g, "")) || 0) * (item.qty ?? 1), 0);
+        return (
+      <div key={scope} className="relative">
         <button
           onClick={() => {
-            setCartOpen(open => !open);
+            setCartOpen(open => open === scope ? null : scope);
             setFavoritesOpen(false);
           }}
           className="relative flex items-center gap-1.5 text-[13px] font-medium text-[#1a1a1a] transition-opacity hover:opacity-70"
-          aria-expanded={cartOpen}
+          aria-expanded={cartOpen === scope}
         >
           <span className="relative">
             <ShoppingCart size={17} strokeWidth={1.5} />
@@ -915,15 +923,15 @@ function HeaderActions({
               </span>
             )}
           </span>
-          Cart
+          {scope === "503B" ? "503B Cart" : "Cart"}
         </button>
 
-        {cartOpen && (
+        {cartOpen === scope && (
           <div className="absolute right-0 top-8 z-50 w-[340px] overflow-hidden rounded-[6px] border border-[#e8e3df] bg-white shadow-[0_18px_45px_rgba(24,50,41,0.18)]">
             <div className="flex h-12 items-center justify-between border-b border-[#eee8e3] px-4">
               <p className="text-[14px] font-medium text-[#6f7782]">{cartItemCount} product{cartItemCount === 1 ? "" : "s"}</p>
               {cartPreviewItems.length > 0 ? (
-                <button onClick={clearCartItems} className="text-[13px] font-semibold text-[#183229] transition-opacity hover:opacity-70">
+                <button onClick={() => clearCartItems(scope)} className="text-[13px] font-semibold text-[#183229] transition-opacity hover:opacity-70">
                   Clear all
                 </button>
               ) : (
@@ -943,16 +951,16 @@ function HeaderActions({
                         Price per unit: <strong className="font-bold text-[#1a1a1a]">{item.price}</strong>
                       </span>
                       <span className="mt-2 inline-flex h-7 items-center overflow-hidden rounded-full border border-[#d8dfdc] bg-white">
-                        <button onClick={() => updateCartItemQty(item.id, -1)} className="flex size-7 items-center justify-center text-[#6f7782] hover:bg-[#eef5f1]" aria-label={`Decrease ${item.name}`}>
+                        <button onClick={() => updateCartItemQty(item.id, -1, scope, true)} className="flex size-7 items-center justify-center text-[#6f7782] hover:bg-[#eef5f1]" aria-label={`Decrease ${item.name}`}>
                           <Minus size={12} />
                         </button>
                         <span className="flex h-7 min-w-7 items-center justify-center px-1 text-[12px] font-semibold text-[#1a1a1a]">{item.qty ?? 1}</span>
-                        <button onClick={() => updateCartItemQty(item.id, 1)} className="flex size-7 items-center justify-center text-[#183229] hover:bg-[#eef5f1]" aria-label={`Increase ${item.name}`}>
+                        <button onClick={() => updateCartItemQty(item.id, 1, scope, true)} className="flex size-7 items-center justify-center text-[#183229] hover:bg-[#eef5f1]" aria-label={`Increase ${item.name}`}>
                           <Plus size={12} />
                         </button>
                       </span>
                     </span>
-                    <button onClick={() => removeCartItem(item.id)} className="flex size-7 items-center justify-center rounded-[6px] text-[#d92d20] opacity-0 transition-all hover:bg-[#fbeaea] group-hover:opacity-100" aria-label={`Remove ${item.name}`}>
+                    <button onClick={() => removeCartItem(item.id, scope)} className="flex size-7 items-center justify-center rounded-[6px] text-[#d92d20] opacity-0 transition-all hover:bg-[#fbeaea] group-hover:opacity-100" aria-label={`Remove ${item.name}`}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -968,8 +976,8 @@ function HeaderActions({
             <div className="border-t border-[#eee8e3] px-3 py-3">
               <button
                 onClick={() => {
-                  setCartOpen(false);
-                  onNavigate(cartPage);
+                  setCartOpen(null);
+                  onNavigate(scope === "503B" ? "cart-503b" : cartPage);
                 }}
                 className="flex h-10 w-full items-center justify-center rounded-[10px] bg-[#183229] text-[12px] font-bold uppercase tracking-[0.02em] text-white transition-colors hover:bg-[#244438]"
               >
@@ -979,12 +987,14 @@ function HeaderActions({
           </div>
         )}
       </div>
+        );
+      })}
 
       <div className="relative">
         <button
           onClick={() => {
             setFavoritesOpen(open => !open);
-            setCartOpen(false);
+            setCartOpen(null);
           }}
           className="relative flex items-center gap-1.5 text-[13px] font-medium text-[#1a1a1a] transition-opacity hover:opacity-70"
           aria-expanded={favoritesOpen}
@@ -3574,11 +3584,12 @@ function ProductDetailPage({
   function addToCart() {
     if (!is503B && selectedPatientCount === 0) return;
     const nextCartMode: CartMode = selectedPatientCount > 1 ? "multi" : "single";
-    setCartMode(nextCartMode);
+    if (!is503B) setCartMode(nextCartMode);
     const itemCount = Math.max(selectedItemCount, 1);
     runWithAppLoader(() => {
       addCartItems(itemCount, {
         id: product.id,
+        catalogType,
         name: product.name,
         price: `$${configuredPrice.toFixed(2)}`,
         img: product.img,
@@ -3620,7 +3631,7 @@ function ProductDetailPage({
       setSelectedPatientIds(new Set());
       setPatientQuantities({});
       setExpandedPatientIds(new Set());
-      showToast("Product added to cart");
+      showToast(is503B ? "Product added to 503B cart" : "Product added to cart");
       window.setTimeout(() => setAddedItemCount(null), 1600);
     });
   }
@@ -3883,7 +3894,7 @@ function ProductDetailPage({
                 <button onClick={() => setPatientPickerOpen(current => !current)} className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d8dce3] bg-white text-[12px] font-medium text-[#111] transition-colors hover:bg-[#f1f1f1]">
                   <Plus size={14} strokeWidth={2} /> Add for another patient
                 </button>
-                <button onClick={() => onNavigate(cartMode === "multi" ? "cart-multi" : "cart-single")} className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#111] bg-[#111] text-[12px] font-medium text-white transition-colors hover:bg-[#121212]">
+                <button onClick={() => onNavigate(is503B ? "cart-503b" : cartMode === "multi" ? "cart-multi" : "cart-single")} className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#111] bg-[#111] text-[12px] font-medium text-white transition-colors hover:bg-[#121212]">
                   View cart <ShoppingCart size={14} strokeWidth={1.5} />
                 </button>
               </>
@@ -9362,6 +9373,7 @@ function CartItemImage({ item }: { item: MultiCartItem }) {
 }
 
 function MultiPatientCartPage({
+  cartScope: scope = "standard",
   onNavigate,
   cartMode,
   setCartMode,
@@ -9370,6 +9382,7 @@ function MultiPatientCartPage({
   extraVariants,
   onUpdateEntryQuantity,
 }: {
+  cartScope?: CartScope;
   onNavigate: (p: Page) => void;
   cartMode: CartMode;
   setCartMode: (mode: CartMode) => void;
@@ -9409,32 +9422,7 @@ function MultiPatientCartPage({
           };
         }),
       }
-    : selectedPatientIds.length > 0
-    ? {
-        ...MULTI_CART_DATA,
-        patients: selectedPatientIds.map((patientId, index) => {
-          const patient = PATIENTS[patientId] ?? PATIENTS[0];
-          const name = `${patient.firstName} ${patient.lastName}`;
-          const addressLines = [
-            patient.address1,
-            patient.address2,
-            `${patient.city}, ${patient.state} ${patient.zip}`,
-          ].filter(Boolean);
-          return {
-            name,
-            dob: patient.birthDate,
-            phone: patient.primaryPhone,
-            email: `${patient.firstName}.${patient.lastName}`.replace(/[^a-z0-9.]/gi, "").toLowerCase() + "@example.com",
-            identification: `${patient.state}:23444244343 (State-Issued ID)`,
-            address: addressLines.join("\n"),
-            items: [
-              { id: index * 2 + 1, name: "Tirzepatide/Pyridoxine (B6)", detail: "20mg/25mg/mL | 1 (0.5mL) Vial", qty: 1, price: 125.43, badge: null, kind: "vial" as const },
-              { id: index * 2 + 2, name: "BD 27G X 1/2 Needle Only", detail: "1 Needle", qty: 1, price: 0, badge: "Supplies", kind: "supply" as const },
-            ],
-          };
-        }),
-      }
-    : DEFAULT_CART_DATA, [cartEntries, selectedPatientIds]);
+    : { ...MULTI_CART_DATA, patients: [] }, [cartEntries]);
   const [quantities, setQuantities] = useState<Record<number, number>>(() => {
     const init: Record<number, number> = {};
     cartData.patients.forEach(p => p.items.forEach(i => { init[i.id] = i.qty; }));
@@ -9448,7 +9436,7 @@ function MultiPatientCartPage({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewSubmissionState, setPreviewSubmissionState] = useState<CheckoutSubmissionState>("idle");
   const [reviewVariant, setReviewVariant] = useState<"current" | "v1" | "v2">("v1");
-  const [paymentMethod, setPaymentMethod] = useState<"patient" | "clinic">("patient");
+  const [paymentMethod, setPaymentMethod] = useState<"patient" | "clinic">(scope === "503B" ? "clinic" : "patient");
   const [shipTo, setShipTo] = useState<"patient" | "clinic">("clinic");
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
@@ -9470,7 +9458,7 @@ function MultiPatientCartPage({
     setQuantities(prev => {
       const next = { ...prev };
       cartData.patients.forEach(patient => patient.items.forEach(item => {
-        if (next[item.id] === undefined) next[item.id] = item.qty;
+        next[item.id] = item.qty;
       }));
       return next;
     });
@@ -9722,9 +9710,21 @@ function MultiPatientCartPage({
   const hasSimpleOpenForm = cartCardVariant === 6 && cartRows.some(({ item }) => !is503BCartItem(item) && expandedPrescriptionIds.has(item.id) && !addedPrescriptionIds.has(item.id));
   const hasFocusedOpenForm = hasBoomOpenForm || hasCompactOpenForm || hasZeeOpenForm || hasSimpleOpenForm;
 
+  if (cartRows.length === 0) return (
+    <>
+      <Header title={scope === "503B" ? "503B Cart" : "Cart"} onNavigate={onNavigate} />
+      <div className="rounded-xl border border-[#e8e3df] bg-white px-6 py-16 text-center">
+        <ShoppingCart size={32} className="mx-auto text-[#9ca9a2]" />
+        <h2 className="mt-4 text-lg font-semibold">{scope === "503B" ? "Your 503B cart is empty" : "Your cart is empty"}</h2>
+        <p className="mt-2 text-sm text-[#6f7782]">{scope === "503B" ? "Add items from the 503B catalog." : "Add items from the catalog or 503A catalog."}</p>
+        <button onClick={() => onNavigate(scope === "503B" ? "catalog-503b" : "products")} className="mt-6 rounded-full bg-[#183229] px-6 py-3 text-sm font-medium text-white">Browse catalog</button>
+      </div>
+    </>
+  );
+
   return (
     <>
-      <Header title="Cart" onNavigate={onNavigate} />
+      <Header title={scope === "503B" ? "503B Cart" : "Cart"} onNavigate={onNavigate} />
 
       <div className="max-w-[1400px]">
         {extraVariants && <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -12464,7 +12464,7 @@ function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick, onCont
 
 function PageContentSkeleton({ page }: { page: Page }) {
   const isTablePage = ["orders", "order-history", "pending-approvals", "users"].includes(page);
-  const isCartPage = page === "cart-single" || page === "cart-multi" || page === "checkout-prescription";
+  const isCartPage = page === "cart-503b" || page === "cart-single" || page === "cart-multi" || page === "checkout-prescription";
   const isSupportPage = page === "support";
 
   if (isTablePage) {
@@ -12554,7 +12554,7 @@ export default function App() {
   const [productCatalogType, setProductCatalogType] = useState<"503A" | "503B" | undefined>();
   function selectProduct(product: CardDef) {
     setSelectedProduct(product);
-    setProductCatalogType(page === "catalog-503b" ? "503B" : page === "catalog-503a" ? "503A" : undefined);
+    setProductCatalogType(page === "catalog-503b" || page === "cart-503b" ? "503B" : page === "product-detail" ? productCatalogType : page === "catalog-503a" ? "503A" : undefined);
   }
   const mainScrollRef = useRef<HTMLElement>(null);
   const [selectedOrder, setSelectedOrder] = useState<typeof ORDERS[number]>(ORDERS[0]);
@@ -12732,39 +12732,46 @@ export default function App() {
     startChatWelcome();
   }
 
-  const cartItemCount = cartPreviewItems.reduce((count, item) => count + (item.qty ?? 1), 0);
+  const cart503BItemCount = cartPreviewItems.filter(item => cartScope(item) === "503B").reduce((count, item) => count + (item.qty ?? 1), 0);
+  const cartItemCount = cartPreviewItems.filter(item => cartScope(item) === "standard").reduce((count, item) => count + (item.qty ?? 1), 0);
 
   function addCartItems(count = 1, product?: CartPreviewItem) {
     if (product) {
       setCartPreviewItems((current) => {
-        const existingIndex = current.findIndex((item) => item.id === product.id);
+        const existingIndex = current.findIndex((item) => item.id === product.id && cartScope(item) === cartScope(product));
         if (existingIndex === -1) {
-          return [{ ...product, qty: product.qty ?? count }, ...current].slice(0, 4);
+          return [{ ...product, qty: product.qty ?? count }, ...current];
         }
         const next = [...current];
         const existing = next[existingIndex];
         next.splice(existingIndex, 1);
-        return [{ ...existing, ...product, qty: (existing.qty ?? 1) + (product.qty ?? count) }, ...next].slice(0, 4);
+        return [{ ...existing, ...product, qty: (existing.qty ?? 1) + (product.qty ?? count) }, ...next];
       });
     }
   }
 
-  function updateCartItemQty(id: number, delta: number) {
+  function updateCartItemQty(id: number, delta: number, scope: CartScope = "standard", syncEntries = false) {
+    if (syncEntries) setPatientCartEntries(current => {
+      const matching = current.filter(entry => entry.product.id === id && cartScope(entry) === scope && entry.qty > 0);
+      const target = delta > 0 ? matching[0] : matching[matching.length - 1];
+      return target ? current.map(entry => entry.id === target.id ? { ...entry, qty: Math.max(0, entry.qty + delta) } : entry).filter(entry => entry.qty > 0) : current;
+    });
     setCartPreviewItems((current) =>
       current
-        .map((item) => item.id === id ? { ...item, qty: Math.max(0, (item.qty ?? 1) + delta) } : item)
+        .map((item) => item.id === id && cartScope(item) === scope ? { ...item, qty: Math.max(0, (item.qty ?? 1) + delta) } : item)
         .filter((item) => (item.qty ?? 1) > 0),
     );
   }
 
-  function removeCartItem(id: number) {
-    setCartPreviewItems((current) => current.filter((item) => item.id !== id));
+  function removeCartItem(id: number, scope: CartScope = "standard") {
+    setCartPreviewItems(current => current.filter(item => !(item.id === id && cartScope(item) === scope)));
+    setPatientCartEntries(current => current.filter(entry => !(entry.product.id === id && cartScope(entry) === scope)));
   }
 
-  function clearCartItems() {
-    setCartPreviewItems([]);
-    setPatientCartEntries([]);
-    setMultiCartPatientIds([]);
+  function clearCartItems(scope: CartScope = "standard") {
+    setCartPreviewItems(current => current.filter(item => cartScope(item) !== scope));
+    setPatientCartEntries(current => current.filter(entry => cartScope(entry) !== scope));
+    if (scope === "standard") setMultiCartPatientIds([]);
   }
 
   function addToPatientCart(entries: PatientCartEntry[]) {
@@ -12775,7 +12782,7 @@ export default function App() {
   function updateCartEntryQuantity(id: number, quantity: number) {
     const entry = patientCartEntries.find(item => item.id === id);
     if (!entry) return;
-    updateCartItemQty(entry.product.id, quantity - entry.qty);
+    updateCartItemQty(entry.product.id, quantity - entry.qty, cartScope(entry));
     setPatientCartEntries(current => current.map(item => item.id === id ? { ...item, qty: quantity } : item));
   }
 
@@ -12853,10 +12860,12 @@ export default function App() {
         return <UsersPage onNavigate={setPage} />;
       case "settings":
         return <SettingsPage onNavigate={setPage} />;
+      case "cart-503b":
+        return <MultiPatientCartPage key="503B" cartScope="503B" onNavigate={setPage} cartMode="single" setCartMode={setCartMode} selectedPatientIds={[]} cartEntries={patientCartEntries.filter(entry => cartScope(entry) === "503B" && entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
       case "cart-single":
-        return <MultiPatientCartPage onNavigate={setPage} cartMode={cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} cartEntries={patientCartEntries} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
+        return <MultiPatientCartPage onNavigate={setPage} cartMode={cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key="standard" cartEntries={patientCartEntries.filter(entry => cartScope(entry) === "standard" && entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
       case "cart-multi":
-        return <MultiPatientCartPage onNavigate={setPage} cartMode={cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} cartEntries={patientCartEntries} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
+        return <MultiPatientCartPage onNavigate={setPage} cartMode={cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key="standard" cartEntries={patientCartEntries.filter(entry => cartScope(entry) === "standard" && entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
       case "checkout-prescription":
         return <CheckoutPrescriptionPage onNavigate={setPage} />;
       default:
@@ -12976,7 +12985,7 @@ export default function App() {
 
   return (
     <AppLoadingContext.Provider value={{ runWithAppLoader, showToast }}>
-      <CartSummaryContext.Provider value={{ cartItemCount, cartPreviewItems, addCartItems, updateCartItemQty, removeCartItem, clearCartItems }}>
+      <CartSummaryContext.Provider value={{ cartItemCount, cart503BItemCount, cartPreviewItems, addCartItems, updateCartItemQty, removeCartItem, clearCartItems }}>
         <ProductFavoritesContext.Provider value={{ favoriteProductIds, setFavoriteProductIds, favoriteProducts }}>
           <div className={`app-theme app-theme-${appTheme} flex h-screen overflow-hidden bg-[var(--app-soft-hover)] font-['Inter',sans-serif]`}>
             {/* Sidebar Navigation */}
@@ -13004,6 +13013,9 @@ export default function App() {
             <main ref={mainScrollRef} className="app-main-scroll h-screen min-w-0 flex-1 overflow-y-scroll p-3 pl-1.5">
               <div className="bg-card rounded-[10px] min-h-full p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 <div className="w-full max-w-[1400px]">
+                  <div className="mb-5 flex justify-end">
+                    <HeaderActions onNavigate={setPage} cartPage={cartPage} onProductSelect={selectProduct} />
+                  </div>
                   {pageLoading ? <PageContentSkeleton page={page} /> : renderPage()}
                 </div>
               </div>
