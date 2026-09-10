@@ -444,7 +444,6 @@ const INITIAL_FAVORITES: MenuItem[] = [
 ];
 
 const INITIAL_MAIN: MenuItem[] = [
-  { icon: BookOpen, label: "Catalog", page: "products" },
   { icon: FlaskConical, label: "503A Catalog", page: "catalog-503a" },
   { icon: Package, label: "503B Catalog", page: "catalog-503b" },
   { icon: ClipboardList, label: "Orders", page: "orders" },
