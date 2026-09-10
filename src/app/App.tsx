@@ -482,6 +482,8 @@ function NavItem({
   const menuOpen = openMenu === label;
   const { cartItemCount, cart503BItemCount } = useCartSummary();
   const badgeCount = page === "orders" ? ORDERS.length : page === "cart-multi" ? cartItemCount : page === "cart-503b" ? cart503BItemCount : null;
+  const catalogLabel = page === "catalog-503a" || page === "cart-multi" ? "503A" : page === "catalog-503b" || page === "cart-503b" ? "503B" : null;
+  const displayLabel = page === "catalog-503a" || page === "catalog-503b" ? "Catalog" : page === "cart-multi" || page === "cart-503b" ? "Cart" : label;
 
   return (
     <div
@@ -504,8 +506,8 @@ function NavItem({
       >
         <Icon size={16} strokeWidth={1.65} className="flex-shrink-0 text-[#303332] transition-transform duration-200 ease-out group-hover:-translate-y-px group-hover:translate-x-0.5 group-hover:rotate-6" />
         <span className="flex flex-1 items-center gap-2">
-          {page === "cart-503b" ? "Cart" : label}
-          {page === "cart-503b" && <span className="rounded-full bg-[#eef3ff] px-2 py-1 text-[10px] font-semibold leading-none text-[#2563EB]">503B</span>}
+          {displayLabel}
+          {catalogLabel && <span className="rounded-full bg-[#eef3ff] px-2 py-1 text-[10px] font-semibold leading-none text-[#2563EB]">{catalogLabel}</span>}
         </span>
         {badgeCount !== null && badgeCount > 0 ? <span className="inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#e9eaec] px-1.5 text-[10px] font-semibold tabular-nums text-[#35383a]">{badgeCount}</span> : <span className="size-6 flex-shrink-0" />}
       </div>
