@@ -17,8 +17,8 @@ function figmaAssetResolver() {
 }
 
 export default defineConfig({
-  // GitHub Pages serves this project from /Dashboard/ rather than the domain root.
-  base: '/Dashboard/',
+  // Match the GitHub Pages repository path.
+  base: '/dashb/',
   plugins: [
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if
