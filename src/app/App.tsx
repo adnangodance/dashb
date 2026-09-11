@@ -1,3 +1,4 @@
+import { EnrollmentModal } from "./EnrollmentModal";
 import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import USAMap from "react-usa-map";
@@ -3154,6 +3155,8 @@ function ProductDetailPage({
   catalogType?: "503A" | "503B";
 }) {
   const is503B = catalogType === "503B";
+  const [enrollmentFormOpen, setEnrollmentFormOpen] = useState(false);
+  const [completedEnrollments, setCompletedEnrollments] = useState<Set<string>>(() => new Set(["1st Choice Compounding Pharmacy"]));
   const isCompoundProduct = product.name.includes("/");
   const isTirzepatidePyridoxine = product.name.toLowerCase().includes("tirzepatide") && product.name.toLowerCase().includes("pyridoxine");
   const defaultSize = product.dosage === "Gel" ? "30g Tube" : product.dosage === "Capsule" ? "30 Capsules" : product.dosage === "Nasal Spray" ? "1 (10mL) Bottle" : product.dosage === "Topical" ? "1 (30mL) Bottle" : product.dosage === "Patch" ? "30 Patches" : isTirzepatidePyridoxine ? "1 (0.5mL) Vial" : "1 (5mL) Vial";
@@ -3264,10 +3267,13 @@ function ProductDetailPage({
   const strengthPriceAdjustment = (Math.max(strengthOptions.indexOf(strength), 0) - Math.max(strengthOptions.indexOf(defaultStrength), 0)) * 5;
   const configurationPriceAdjustment = sizePriceAdjustment + strengthPriceAdjustment;
   const pharmacies = [
-    { name: product.pharmacy, turnaround: "1-2 business days", price: baseProductPrice },
-    { name: product.pharmacy === "Rush Pharmacy FL" ? "Optimal Balance Pharmacy" : "Rush Pharmacy FL", turnaround: "1-2 business days", price: baseProductPrice + 20 },
+    { name: is503B ? "1st Choice Compounding Pharmacy" : product.pharmacy, turnaround: "1-2 business days", price: baseProductPrice },
+    { name: !is503B && product.pharmacy === "Rush Pharmacy FL" ? "Optimal Balance Pharmacy" : "Rush Pharmacy FL", turnaround: "1-2 business days", price: baseProductPrice + 20 },
   ];
   const selectedPharmacy = pharmacies.find(option => option.name === pharmacy) ?? pharmacies[0];
+  // Demo enrollment is specific to the pharmacy; replace with the doctor's account status.
+  const enrolled503BPharmacies = completedEnrollments;
+  const requires503BEnrollment = is503B && !enrolled503BPharmacies.has(selectedPharmacy.name);
   const configuredPrice = Math.max(0, selectedPharmacy.price + configurationPriceAdjustment);
   const priceChangeKey = `${size}-${strength}-${pharmacy}`;
   const selectedPatientCount = selectedPatientIds.size;
@@ -3348,6 +3354,7 @@ function ProductDetailPage({
   }
 
   function addToCart() {
+    if (requires503BEnrollment) return;
     if (!is503B && selectedPatientCount === 0) return;
     const nextCartMode: CartMode = selectedPatientCount > 1 ? "multi" : "single";
     if (!is503B) setCartMode(nextCartMode);
@@ -3539,7 +3546,7 @@ function ProductDetailPage({
             <div className={isReferenceStyle ? "mb-3 flex items-center gap-3" : ""}><p className={`${isReferenceStyle ? "shrink-0 text-[12px] font-medium" : "mb-2 text-[12px] font-medium"} text-[#111]`}>Pharmacy</p>{isReferenceStyle && <span className="h-px flex-1 bg-[#e5e5e5]" />}</div>
             <div className="space-y-2">
               {pharmacies.slice(0, 2).map(option => {
-                const selected = pharmacy === option.name;
+                const selected = selectedPharmacy.name === option.name;
                 const outlineSelected = productDetailVariant === 4
                   ? "border-2 border-[#00B53F] bg-white shadow-[0_0_0_3px_rgba(0,181,63,0.10)]"
                   : productDetailVariant === 1
@@ -3550,7 +3557,7 @@ function ProductDetailPage({
                   ? "border-2 border-[#171a20] bg-white"
                   : "border-[#183229] bg-[#eef7f2] shadow-[0_8px_18px_rgba(24,50,41,0.08)]";
                 return (
-                  <button key={option.name} onClick={() => setPharmacy(option.name)} className={`relative grid w-full grid-cols-[minmax(0,1fr)_90px] items-center border px-3 text-left transition-colors ${isReferenceStyle ? "min-h-[58px] rounded-[8px] py-2.5" : "rounded-[8px] py-3"} ${selected && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : selected ? outlineSelected : "border-[#bdbdbd] bg-white hover:border-[#555]"}`}>
+                  <button key={option.name} onClick={() => { setPharmacy(option.name); setEnrollmentFormOpen(false); setAddedItemCount(null); }} className={`relative grid w-full grid-cols-[minmax(0,1fr)_90px] items-center border px-3 text-left transition-colors ${isReferenceStyle ? "min-h-[58px] rounded-[8px] py-2.5" : "rounded-[8px] py-3"} ${selected && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : selected ? outlineSelected : "border-[#bdbdbd] bg-white hover:border-[#555]"}`}>
                     {selected && isReferenceStyle && <CheckCircle2 size={18} strokeWidth={2.2} className={`absolute -right-2 -top-2 text-white ${isBlueReference ? "fill-[#2563EB]" : "fill-black"}`} />}
                     <span className="min-w-0">
                       <span className={`flex items-center gap-1.5 truncate text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>
@@ -3558,6 +3565,12 @@ function ProductDetailPage({
                         {option.name}
                       </span>
                       <span className={`mt-0.5 block text-[10px] ${selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>BUD: 90 Days</span>
+                      {is503B && !enrolled503BPharmacies.has(option.name) && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#fff3df] px-2 py-0.5 text-[10px] font-medium text-[#916422]">
+                          <Lock size={10} />
+                          Enrollment required
+                        </span>
+                      )}
                     </span>
                     <span className="text-right">
                       <span className={`block text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>${Math.max(0, option.price + configurationPriceAdjustment).toFixed(2)}</span>
@@ -3646,11 +3659,11 @@ function ProductDetailPage({
 
           {is503B ? (
             <div className="mt-6">
-              <label htmlFor="catalog-503b-quantity" className="mb-3 block text-[12px] font-medium text-[#111]">Quantity</label>
-              <div className="inline-flex h-11 items-center overflow-hidden rounded-full border border-[#d8dce3] bg-white">
-                <button type="button" aria-label="Decrease quantity" disabled={qty <= 1} onClick={() => setQty(current => Math.max(1, current - 1))} className="flex h-11 w-11 items-center justify-center hover:bg-[#f7f7f7] disabled:opacity-40"><Minus size={16} /></button>
-                <input id="catalog-503b-quantity" type="number" min={1} step={1} value={qty} onChange={event => setQty(Math.max(1, Math.floor(Number(event.target.value) || 1)))} className="h-11 w-16 bg-transparent text-center text-[13px] font-medium outline-none focus:ring-2 focus:ring-inset focus:ring-[#2563EB]" />
-                <button type="button" aria-label="Increase quantity" onClick={() => setQty(current => current + 1)} className="flex h-11 w-11 items-center justify-center hover:bg-[#f7f7f7]"><Plus size={16} /></button>
+              <label htmlFor="catalog-503b-quantity" className="mb-2 block text-[12px] font-medium text-[#555]">Quantity</label>
+              <div className="flex h-11 w-full items-center overflow-hidden rounded-full border border-[#e2e2e2] bg-white">
+                <button type="button" aria-label="Decrease quantity" disabled={qty <= 1} onClick={() => setQty(current => Math.max(1, current - 1))} className="flex h-11 w-11 shrink-0 items-center justify-center text-[#202020] transition-colors hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"><Minus size={16} /></button>
+                <input id="catalog-503b-quantity" type="number" inputMode="numeric" min={1} step={1} value={qty} onFocus={event => event.currentTarget.select()} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onChange={event => setQty(Math.max(1, Math.floor(Number(event.target.value) || 1)))} className="h-11 min-w-0 flex-1 bg-transparent text-center text-[13px] font-medium text-[#171717] outline-none focus:bg-[#f7f7f7] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]" />
+                <button type="button" aria-label="Increase quantity" onClick={() => setQty(current => current + 1)} className="flex h-11 w-11 shrink-0 items-center justify-center text-[#202020] transition-colors hover:bg-[#f7f7f7]"><Plus size={16} /></button>
               </div>
             </div>
           ) : (
@@ -3704,13 +3717,28 @@ function ProductDetailPage({
           {(is503B || !(lastAddedItemCount !== null && selectedPatientCount === 0)) && (
             <button
               onClick={addToCart}
-              disabled={!is503B && selectedPatientCount === 0}
+              disabled={requires503BEnrollment || (!is503B && selectedPatientCount === 0)}
+              aria-describedby={requires503BEnrollment ? "catalog-503b-enrollment-notice" : undefined}
               className={`mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full text-[12px] font-medium text-white transition-colors ${addedItemCount !== null ? "bg-[#111] disabled:bg-[#111]" : "bg-[#111] hover:bg-[#121212] disabled:cursor-not-allowed disabled:bg-[#b8b8b8]"}`}
             >
-              {addedItemCount !== null
+              {requires503BEnrollment
+                ? <>Add to cart <Lock size={14} strokeWidth={1.5} /></>
+                : addedItemCount !== null
                 ? <>Added <Check size={14} strokeWidth={2.2} /></>
                 : <>{selectedItemCount > 1 ? `Add ${selectedItemCount} items to cart` : "Add to cart"} <ShoppingCart size={14} strokeWidth={1.5} /></>}
             </button>
+          )}
+
+          {requires503BEnrollment && (
+            <div id="catalog-503b-enrollment-notice" className="mt-4 rounded-[20px] bg-[linear-gradient(135deg,#fffdf5_0%,#fff0d6_60%,#fbe8da_100%)] p-4">
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold text-[#483b24]">Enroll with {selectedPharmacy.name}</p>
+                <p className="mt-1.5 text-[12px] leading-5 text-[#78684d]">Complete this pharmacy’s enrollment form before adding products to your cart.</p>
+                <button type="button" onClick={() => setEnrollmentFormOpen(true)} aria-haspopup="dialog" className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-white text-[12px] font-semibold text-[#483b24] transition-colors hover:bg-[#fffaf2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7791f]">
+                  Apply for Enrollment<ArrowUpRight size={14} />
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="mt-3 overflow-hidden rounded-[9px] bg-[#f7f7f7]">
@@ -3845,6 +3873,13 @@ function ProductDetailPage({
         </div>
       </section>
       </div>
+      {requires503BEnrollment && enrollmentFormOpen && (
+        <EnrollmentModal pharmacy={selectedPharmacy.name} onClose={() => setEnrollmentFormOpen(false)} onComplete={() => {
+          setCompletedEnrollments(current => new Set([...current, selectedPharmacy.name]));
+          setEnrollmentFormOpen(false);
+        }} />
+      )}
+
       {questionModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="product-question-title">
           <div className="w-full max-w-[560px] rounded-[18px] border border-[#ece8e3] bg-white p-5 shadow-[0_28px_80px_rgba(0,0,0,0.22)]">
