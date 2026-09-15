@@ -1,4 +1,6 @@
 import { EnrollmentModal } from "./EnrollmentModal";
+import { CartConflictModal } from "./CartConflictModal";
+import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType, type CartConflict } from "./cart-rules";
 import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import USAMap from "react-usa-map";
@@ -137,7 +139,6 @@ type Page =
   | "users"
   | "settings"
   | "cart-single"
-  | "cart-503b"
   | "cart-multi"
   | "checkout-prescription";
 
@@ -236,12 +237,13 @@ const cartScope = (item: { catalogType?: "503A" | "503B" }): CartScope => item.c
 
 type CartSummaryContextValue = {
   cartItemCount: number;
-  cart503BItemCount: number;
+  activeCartCatalogType: CatalogType | null;
   cartPreviewItems: CartPreviewItem[];
-  addCartItems: (count?: number, product?: CartPreviewItem) => void;
+  checkCartCompatibility: (catalogType?: CatalogType) => boolean;
+  addCartItems: (count?: number, product?: CartPreviewItem) => boolean;
   updateCartItemQty: (id: number, delta: number, scope?: CartScope, syncEntries?: boolean) => void;
   removeCartItem: (id: number, scope?: CartScope) => void;
-  clearCartItems: (scope?: CartScope) => void;
+  clearCartItems: () => void;
 };
 
 type CartPreviewItem = {
@@ -273,9 +275,10 @@ function useCartSummary() {
   if (!context) {
     return {
       cartItemCount: 0,
-      cart503BItemCount: 0,
+      activeCartCatalogType: null,
       cartPreviewItems: [],
-      addCartItems: () => undefined,
+      checkCartCompatibility: () => false,
+      addCartItems: () => false,
       updateCartItemQty: () => undefined,
       removeCartItem: () => undefined,
       clearCartItems: () => undefined,
@@ -451,7 +454,6 @@ const INITIAL_MAIN: MenuItem[] = [
   { icon: History, label: "Order History", page: "order-history" },
   { icon: CheckCircle2, label: "Pending Approvals", page: "pending-approvals" },
   { icon: ShoppingCart, label: "Cart", page: "cart-multi" },
-  { icon: ShoppingCart, label: "503B Cart", page: "cart-503b" },
   { icon: Users, label: "Patients", page: "users" },
   { icon: MessageSquare, label: "Support Tickets", page: "support" },
 ];
@@ -480,10 +482,10 @@ function NavItem({
   const { icon: Icon, label, page } = item;
   const isHovered = hoveredItem === label;
   const menuOpen = openMenu === label;
-  const { cartItemCount, cart503BItemCount } = useCartSummary();
-  const badgeCount = page === "orders" ? ORDERS.length : page === "cart-multi" ? cartItemCount : page === "cart-503b" ? cart503BItemCount : null;
-  const catalogLabel = page === "catalog-503a" || page === "cart-multi" ? "503A" : page === "catalog-503b" || page === "cart-503b" ? "503B" : null;
-  const displayLabel = page === "catalog-503a" || page === "catalog-503b" ? "Catalog" : page === "cart-multi" || page === "cart-503b" ? "Cart" : label;
+  const { cartItemCount } = useCartSummary();
+  const badgeCount = page === "orders" ? ORDERS.length : page === "cart-multi" ? cartItemCount : null;
+  const catalogLabel = page === "catalog-503a" ? "503A" : page === "catalog-503b" ? "503B" : null;
+  const displayLabel = page === "catalog-503a" || page === "catalog-503b" ? "Catalog" : label;
 
   return (
     <div
@@ -625,7 +627,7 @@ function Sidebar({
         <p className="mb-1.5 px-2.5 text-[10px] font-medium uppercase tracking-[0.08em] text-[#A0A4A2]">Main Menu</p>
         <div className="flex flex-col gap-0.5">
           {mainMenu.map((item) => {
-            const isActive = item.page === "cart-multi" ? active === cartPage : item.page === "orders" ? active === "orders" || active === "order-detail" : active === item.page && item.label !== "Hard Refresh";
+            const isActive = item.page === "cart-multi" ? active === cartPage || active === "cart-single" : item.page === "orders" ? active === "orders" || active === "order-detail" : active === item.page && item.label !== "Hard Refresh";
             return <NavItem key={item.label} item={item} isPinned={false} isActive={isActive} {...navItemProps} />;
           })}
         </div>
@@ -1749,7 +1751,7 @@ function FavoritesPage({
   onProductSelect: (product: CardDef) => void;
 }) {
   const { favoriteProducts, setFavoriteProductIds } = useProductFavorites();
-  const { addCartItems } = useCartSummary();
+  const { addCartItems, checkCartCompatibility } = useCartSummary();
   const { runWithAppLoader, showToast } = useAppLoading();
 
   function removeFavorite(id: number) {
@@ -1761,14 +1763,15 @@ function FavoritesPage({
   }
 
   function addFavoriteProductToCart(product: CardDef) {
+    if (!checkCartCompatibility("503A")) return;
     runWithAppLoader(() => {
-      addCartItems(1, {
+      if (!addCartItems(1, {
         id: product.id,
         name: product.name,
         price: product.price,
         img: product.img,
         qty: 1,
-      });
+      })) return;
       showToast("Product added to cart");
     });
   }
@@ -3189,7 +3192,8 @@ function ProductDetailPage({
   const [discountApplying, setDiscountApplying] = useState(false);
   const configurationCardRef = useRef<HTMLDivElement>(null);
   const [productCardHeight, setProductCardHeight] = useState(825);
-  const { addCartItems, updateCartItemQty } = useCartSummary();
+  const { addCartItems, updateCartItemQty, activeCartCatalogType, checkCartCompatibility } = useCartSummary();
+  const hasCartConflict = activeCartCatalogType !== null && activeCartCatalogType !== (catalogType ?? "503A");
   const { runWithAppLoader, showToast } = useAppLoading();
 
   useEffect(() => {
@@ -3354,20 +3358,21 @@ function ProductDetailPage({
   }
 
   function addToCart() {
+    if (!checkCartCompatibility(catalogType)) return;
     if (requires503BEnrollment) return;
     if (!is503B && selectedPatientCount === 0) return;
     const nextCartMode: CartMode = selectedPatientCount > 1 ? "multi" : "single";
-    if (!is503B) setCartMode(nextCartMode);
     const itemCount = Math.max(selectedItemCount, 1);
     runWithAppLoader(() => {
-      addCartItems(itemCount, {
+      if (!addCartItems(itemCount, {
         id: product.id,
         catalogType,
         name: product.name,
         price: `$${configuredPrice.toFixed(2)}`,
         img: product.img,
         qty: itemCount,
-      });
+      })) return;
+      if (!is503B) setCartMode(nextCartMode);
       onAddToPatientCart(is503B ? [{
         id: Date.now(), patientId: null, catalogType: "503B", product,
         qty: itemCount, pharmacy: selectedPharmacy.name, size, strength,
@@ -3404,7 +3409,7 @@ function ProductDetailPage({
       setSelectedPatientIds(new Set());
       setPatientQuantities({});
       setExpandedPatientIds(new Set());
-      showToast(is503B ? "Product added to 503B cart" : "Product added to cart");
+      showToast("Product added to cart");
       window.setTimeout(() => setAddedItemCount(null), 1600);
     });
   }
@@ -3673,7 +3678,7 @@ function ProductDetailPage({
                 <button onClick={() => setPatientPickerOpen(current => !current)} className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#d8dce3] bg-white text-[12px] font-medium text-[#111] transition-colors hover:bg-[#f1f1f1]">
                   <Plus size={14} strokeWidth={2} /> Add for another patient
                 </button>
-                <button onClick={() => onNavigate(is503B ? "cart-503b" : cartMode === "multi" ? "cart-multi" : "cart-single")} className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#111] bg-[#111] text-[12px] font-medium text-white transition-colors hover:bg-[#121212]">
+                <button onClick={() => onNavigate("cart-multi")} className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#111] bg-[#111] text-[12px] font-medium text-white transition-colors hover:bg-[#121212]">
                   View cart <ShoppingCart size={14} strokeWidth={1.5} />
                 </button>
               </>
@@ -3714,14 +3719,14 @@ function ProductDetailPage({
           </div>
           )}
 
-          {(is503B || !(lastAddedItemCount !== null && selectedPatientCount === 0)) && (
+          {(hasCartConflict || is503B || !(lastAddedItemCount !== null && selectedPatientCount === 0)) && (
             <button
               onClick={addToCart}
-              disabled={requires503BEnrollment || (!is503B && selectedPatientCount === 0)}
-              aria-describedby={requires503BEnrollment ? "catalog-503b-enrollment-notice" : undefined}
+              disabled={!hasCartConflict && (requires503BEnrollment || (!is503B && selectedPatientCount === 0))}
+              aria-describedby={!hasCartConflict && requires503BEnrollment ? "catalog-503b-enrollment-notice" : undefined}
               className={`mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-full text-[12px] font-medium text-white transition-colors ${addedItemCount !== null ? "bg-[#111] disabled:bg-[#111]" : "bg-[#111] hover:bg-[#121212] disabled:cursor-not-allowed disabled:bg-[#b8b8b8]"}`}
             >
-              {requires503BEnrollment
+              {!hasCartConflict && requires503BEnrollment
                 ? <>Add to cart <Lock size={14} strokeWidth={1.5} /></>
                 : addedItemCount !== null
                 ? <>Added <Check size={14} strokeWidth={2.2} /></>
@@ -9134,10 +9139,6 @@ type MultiCartItem = {
   vialPalette?: VialPalette;
 };
 
-function cartCatalogType(item: MultiCartItem) {
-  return item.catalogType;
-}
-
 function is503BCartItem(item: MultiCartItem) {
   return item.catalogType === "503B";
 }
@@ -9174,7 +9175,6 @@ function CartItemImage({ item }: { item: MultiCartItem }) {
 }
 
 function MultiPatientCartPage({
-  cartScope: scope = "standard",
   onNavigate,
   cartMode,
   setCartMode,
@@ -9183,7 +9183,6 @@ function MultiPatientCartPage({
   extraVariants,
   onUpdateEntryQuantity,
 }: {
-  cartScope?: CartScope;
   onNavigate: (p: Page) => void;
   cartMode: CartMode;
   setCartMode: (mode: CartMode) => void;
@@ -9237,7 +9236,7 @@ function MultiPatientCartPage({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewSubmissionState, setPreviewSubmissionState] = useState<CheckoutSubmissionState>("idle");
   const [reviewVariant, setReviewVariant] = useState<"current" | "v1" | "v2">("v1");
-  const [paymentMethod, setPaymentMethod] = useState<"patient" | "clinic">(scope === "503B" ? "clinic" : "patient");
+  const [paymentMethod, setPaymentMethod] = useState<"patient" | "clinic">(cartEntries.some(entry => entry.catalogType === "503B") ? "clinic" : "patient");
   const [shipTo, setShipTo] = useState<"patient" | "clinic">("clinic");
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
@@ -9513,19 +9512,19 @@ function MultiPatientCartPage({
 
   if (cartRows.length === 0) return (
     <>
-      <Header title={scope === "503B" ? "503B Cart" : "Cart"} onNavigate={onNavigate} />
+      <Header title="Cart" onNavigate={onNavigate} />
       <div className="rounded-xl border border-[#e8e3df] bg-white px-6 py-16 text-center">
         <ShoppingCart size={32} className="mx-auto text-[#9ca9a2]" />
-        <h2 className="mt-4 text-lg font-semibold">{scope === "503B" ? "Your 503B cart is empty" : "Your cart is empty"}</h2>
-        <p className="mt-2 text-sm text-[#6f7782]">{scope === "503B" ? "Add items from the 503B catalog." : "Add items from the catalog or 503A catalog."}</p>
-        <button onClick={() => onNavigate(scope === "503B" ? "catalog-503b" : "products")} className="mt-6 rounded-full bg-[#183229] px-6 py-3 text-sm font-medium text-white">Browse catalog</button>
+        <h2 className="mt-4 text-lg font-semibold">Your cart is empty</h2>
+        <p className="mt-2 text-sm text-[#6f7782]">Add items from the catalog.</p>
+        <button onClick={() => onNavigate("products")} className="mt-6 rounded-full bg-[#183229] px-6 py-3 text-sm font-medium text-white">Browse catalog</button>
       </div>
     </>
   );
 
   return (
     <>
-      <Header title={scope === "503B" ? "503B Cart" : "Cart"} onNavigate={onNavigate} />
+      <Header title="Cart" onNavigate={onNavigate} />
 
       <div className="max-w-[1400px]">
         {extraVariants && <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -9544,9 +9543,6 @@ function MultiPatientCartPage({
           <section className="min-w-0">
             {cartRowsWithNumbers.map(({ patient, item }, rowIndex) => {
               const pharmacy = item.pharmacy ?? cartData.pharmacy;
-              const pharmacyCatalogTypes = (["503A", "503B"] as const).filter(type =>
-                cartRowsWithNumbers.some(row => (row.item.pharmacy ?? cartData.pharmacy) === pharmacy && cartCatalogType(row.item) === type)
-              );
               const isFirstInPharmacy = rowIndex === 0 || (cartRowsWithNumbers[rowIndex - 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
               const isLastInPharmacy = rowIndex === cartRowsWithNumbers.length - 1 || (cartRowsWithNumbers[rowIndex + 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
               const includedSupplies = patient.items.filter(supply => supply.kind === "supply" && !removed.has(supply.id));
@@ -9572,12 +9568,6 @@ function MultiPatientCartPage({
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className={cartCardVariant === 3 ? "text-[13px] font-medium text-[#171717]" : "text-[16px] font-medium text-[#171717]"}>{pharmacy} Cart</h2>
-                          {pharmacyCatalogTypes.map(type => (
-                            <span key={type} className="shrink-0 rounded-full bg-[#eef3ff] px-2 py-1 text-[10px] font-semibold leading-none text-[#2563EB]">
-                              {type}
-                            </span>
-                          ))}
-
                         </div>
                         <div className="flex items-center gap-3">
                           <select
@@ -10269,7 +10259,7 @@ function MultiPatientCartPage({
                 return (
                   <div key={item.id} className={`mt-3 p-4 ${reviewVariant !== "v1" ? "border-t border-dashed border-[#d6d6d6] bg-white px-0 shadow-none" : "rounded-[10px] border border-[#e3e5e8] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.035)]"}`}>
                     <div className="flex items-center gap-2 border-b border-[#ededed] pb-3">
-                      <p className="min-w-0 truncate text-[11px] font-medium text-[#222]">{is503BCartItem(item) ? "503B Item" : cartCatalogType(item) === "503A" ? "503A Prescription" : "Prescription"} {prescriptionNumber}</p>
+                      <p className="min-w-0 truncate text-[11px] font-medium text-[#222]">{is503BCartItem(item) ? "Item" : "Prescription"} {prescriptionNumber}</p>
                     </div>
                     <div className="mt-3 flex items-start gap-3">
                       <CartItemImage item={item} />
@@ -12268,7 +12258,7 @@ function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick, onCont
 
 function PageContentSkeleton({ page }: { page: Page }) {
   const isTablePage = ["orders", "order-history", "pending-approvals", "users"].includes(page);
-  const isCartPage = page === "cart-503b" || page === "cart-single" || page === "cart-multi" || page === "checkout-prescription";
+  const isCartPage = page === "cart-single" || page === "cart-multi" || page === "checkout-prescription";
   const isSupportPage = page === "support";
 
   if (isTablePage) {
@@ -12358,7 +12348,7 @@ export default function App() {
   const [productCatalogType, setProductCatalogType] = useState<"503A" | "503B" | undefined>();
   function selectProduct(product: CardDef) {
     setSelectedProduct(product);
-    setProductCatalogType(page === "catalog-503b" || page === "cart-503b" ? "503B" : page === "product-detail" ? productCatalogType : page === "catalog-503a" ? "503A" : undefined);
+    setProductCatalogType(page === "catalog-503b" ? "503B" : page === "product-detail" ? productCatalogType : page === "cart-single" || page === "cart-multi" ? activeCartCatalogType ?? "503A" : "503A");
   }
   const mainScrollRef = useRef<HTMLElement>(null);
   const [selectedOrder, setSelectedOrder] = useState<typeof ORDERS[number]>(ORDERS[0]);
@@ -12371,6 +12361,9 @@ export default function App() {
   );
   const cartPage: Page = "cart-multi";
   const [cartPreviewItems, setCartPreviewItems] = useState<CartPreviewItem[]>([]);
+  const cartPreviewItemsRef = useRef<CartPreviewItem[]>([]);
+  const [cartConflict, setCartConflict] = useState<CartConflict | null>(null);
+  const activeCartCatalogType = getCartCatalogType(cartPreviewItems);
   const [appLoading, setAppLoading] = useState(false);
   const [appToast, setAppToast] = useState<{ id: number; type: "success" | "error"; message: string } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -12536,22 +12529,31 @@ export default function App() {
     startChatWelcome();
   }
 
-  const cart503BItemCount = cartPreviewItems.filter(item => cartScope(item) === "503B").reduce((count, item) => count + (item.qty ?? 1), 0);
-  const cartItemCount = cartPreviewItems.filter(item => cartScope(item) === "standard").reduce((count, item) => count + (item.qty ?? 1), 0);
+  const cartItemCount = cartPreviewItems.reduce((count, item) => count + (item.qty ?? 1), 0);
+
+  function updateCartPreviewItems(update: (items: CartPreviewItem[]) => CartPreviewItem[]) {
+    const next = update(cartPreviewItemsRef.current);
+    // Keep delayed additions and repeated clicks in sync before React renders.
+    cartPreviewItemsRef.current = next;
+    setCartPreviewItems(next);
+  }
+
+  function checkCartCompatibility(catalogType: CatalogType = "503A") {
+    const conflict = getCartConflict(cartPreviewItemsRef.current, catalogType);
+    if (!conflict) return true;
+    setCartConflict(conflict);
+    return false;
+  }
 
   function addCartItems(count = 1, product?: CartPreviewItem) {
-    if (product) {
-      setCartPreviewItems((current) => {
-        const existingIndex = current.findIndex((item) => item.id === product.id && cartScope(item) === cartScope(product));
-        if (existingIndex === -1) {
-          return [{ ...product, qty: product.qty ?? count }, ...current];
-        }
-        const next = [...current];
-        const existing = next[existingIndex];
-        next.splice(existingIndex, 1);
-        return [{ ...existing, ...product, qty: (existing.qty ?? 1) + (product.qty ?? count) }, ...next];
-      });
+    if (!product) return false;
+    const result = addCartProduct(cartPreviewItemsRef.current, product, count);
+    if (!result.ok) {
+      setCartConflict(result.conflict);
+      return false;
     }
+    updateCartPreviewItems(() => result.items);
+    return true;
   }
 
   function updateCartItemQty(id: number, delta: number, scope: CartScope = "standard", syncEntries = false) {
@@ -12560,7 +12562,7 @@ export default function App() {
       const target = delta > 0 ? matching[0] : matching[matching.length - 1];
       return target ? current.map(entry => entry.id === target.id ? { ...entry, qty: Math.max(0, entry.qty + delta) } : entry).filter(entry => entry.qty > 0) : current;
     });
-    setCartPreviewItems((current) =>
+    updateCartPreviewItems((current) =>
       current
         .map((item) => item.id === id && cartScope(item) === scope ? { ...item, qty: Math.max(0, (item.qty ?? 1) + delta) } : item)
         .filter((item) => (item.qty ?? 1) > 0),
@@ -12568,17 +12570,19 @@ export default function App() {
   }
 
   function removeCartItem(id: number, scope: CartScope = "standard") {
-    setCartPreviewItems(current => current.filter(item => !(item.id === id && cartScope(item) === scope)));
+    updateCartPreviewItems(current => current.filter(item => !(item.id === id && cartScope(item) === scope)));
     setPatientCartEntries(current => current.filter(entry => !(entry.product.id === id && cartScope(entry) === scope)));
   }
 
-  function clearCartItems(scope: CartScope = "standard") {
-    setCartPreviewItems(current => current.filter(item => cartScope(item) !== scope));
-    setPatientCartEntries(current => current.filter(entry => cartScope(entry) !== scope));
-    if (scope === "standard") setMultiCartPatientIds([]);
+  function clearCartItems() {
+    updateCartPreviewItems(() => []);
+    setPatientCartEntries([]);
+    setMultiCartPatientIds([]);
+    setCartMode("single");
   }
 
   function addToPatientCart(entries: PatientCartEntry[]) {
+    if (!entries.every(entry => checkCartCompatibility(entry.catalogType))) return;
     setPatientCartEntries(current => [...current, ...entries]);
     setMultiCartPatientIds(current => [...new Set([...current, ...entries.flatMap(entry => entry.patientId === null ? [] : [entry.patientId])])]);
   }
@@ -12664,12 +12668,9 @@ export default function App() {
         return <UsersPage onNavigate={setPage} />;
       case "settings":
         return <SettingsPage onNavigate={setPage} />;
-      case "cart-503b":
-        return <MultiPatientCartPage key="503B" cartScope="503B" onNavigate={setPage} cartMode="single" setCartMode={setCartMode} selectedPatientIds={[]} cartEntries={patientCartEntries.filter(entry => cartScope(entry) === "503B" && entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
       case "cart-single":
-        return <MultiPatientCartPage onNavigate={setPage} cartMode={cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key="standard" cartEntries={patientCartEntries.filter(entry => cartScope(entry) === "standard" && entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
       case "cart-multi":
-        return <MultiPatientCartPage onNavigate={setPage} cartMode={cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key="standard" cartEntries={patientCartEntries.filter(entry => cartScope(entry) === "standard" && entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
+        return <MultiPatientCartPage onNavigate={setPage} cartMode={activeCartCatalogType === "503B" ? "single" : cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key={activeCartCatalogType ?? "empty"} cartEntries={patientCartEntries.filter(entry => entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
       case "checkout-prescription":
         return <CheckoutPrescriptionPage onNavigate={setPage} />;
       default:
@@ -12789,7 +12790,7 @@ export default function App() {
 
   return (
     <AppLoadingContext.Provider value={{ runWithAppLoader, showToast }}>
-      <CartSummaryContext.Provider value={{ cartItemCount, cart503BItemCount, cartPreviewItems, addCartItems, updateCartItemQty, removeCartItem, clearCartItems }}>
+      <CartSummaryContext.Provider value={{ cartItemCount, activeCartCatalogType, cartPreviewItems, checkCartCompatibility, addCartItems, updateCartItemQty, removeCartItem, clearCartItems }}>
         <ProductFavoritesContext.Provider value={{ favoriteProductIds, setFavoriteProductIds, favoriteProducts }}>
           <div className={`app-theme app-theme-${appTheme} flex h-screen overflow-hidden bg-[var(--app-soft-hover)] font-['Inter',sans-serif]`}>
             {/* Sidebar Navigation */}
@@ -12913,6 +12914,11 @@ export default function App() {
           </div>
           <AppActionOverlay active={appLoading} />
           <AppToast toast={appToast} onClose={() => setAppToast(null)} />
+          {cartConflict && <CartConflictModal conflict={cartConflict} onClose={() => setCartConflict(null)} onClear={() => {
+            clearCartItems();
+            setCartConflict(null);
+            showToast(`Cart cleared. You can now add ${cartConflict.incomingType} products.`);
+          }} />}
         </ProductFavoritesContext.Provider>
       </CartSummaryContext.Provider>
     </AppLoadingContext.Provider>
