@@ -1,7 +1,8 @@
 import { EnrollmentModal } from "./EnrollmentModal";
 import { CartConflictModal } from "./CartConflictModal";
+import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
 import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType, type CartConflict } from "./cart-rules";
-import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
+import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import USAMap from "react-usa-map";
 import {
@@ -289,7 +290,7 @@ function useCartSummary() {
 
 type AppLoadingContextValue = {
   runWithAppLoader: (action: () => void, delayMs?: number) => void;
-  showToast: (message: string, type?: "success" | "error") => void;
+  showToast: (message: string, type?: ToastType) => void;
 };
 
 const AppLoadingContext = createContext<AppLoadingContextValue | null>(null);
@@ -350,36 +351,6 @@ function AppActionOverlay({ active }: { active: boolean }) {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/65 backdrop-blur-[1px]" role="status" aria-live="polite" aria-label="Processing">
       <Loader2 size={42} className="animate-spin text-[#183229]" />
-    </div>
-  );
-}
-
-function AppToast({
-  toast,
-  onClose,
-}: {
-  toast: { type: "success" | "error"; message: string } | null;
-  onClose: () => void;
-}) {
-  if (!toast) return null;
-
-  const isSuccess = toast.type === "success";
-
-  return (
-    <div className="fixed bottom-6 left-1/2 z-[10000] w-[min(418px,calc(100vw-24px))] -translate-x-1/2" role="status" aria-live="polite">
-      <div className="flex h-[45px] items-center gap-2 rounded-full bg-white px-4 shadow-[0_5px_0_rgba(20,20,20,0.10),0_9px_10px_rgba(20,20,20,0.24)]">
-        <span className={`flex size-[14px] shrink-0 items-center justify-center rounded-full text-white ${isSuccess ? "bg-[#45AD68]" : "bg-[#EB4F47]"}`}>
-          {isSuccess ? <Check size={8} strokeWidth={3} /> : <X size={8} strokeWidth={3} />}
-        </span>
-        <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#171717]">{toast.message}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-[33px] shrink-0 rounded-full bg-[#485DDD] px-[15px] text-[12px] font-medium text-white transition-colors hover:bg-[#3E52CF]"
-        >
-          Got it
-        </button>
-      </div>
     </div>
   );
 }
@@ -1504,6 +1475,7 @@ type CardDef = {
   heartVariant: "green" | "black" | "none";
   strength?: string;
   vialPalette?: VialPalette;
+  processingDelayByPharmacy?: Record<string, string>;
 };
 
 function injectionArea(name: string) {
@@ -1573,6 +1545,10 @@ const INJECTION_CARDS: CardDef[] = INJECTION_PRODUCT_SEEDS.map((product, index) 
   btnOffsetX: 168,
   heartVariant: "black" as const,
   vialPalette: injectionPalette(product.catalogNumber),
+  // Example product-specific delay; other products keep their normal processing time.
+  processingDelayByPharmacy: product.catalogNumber === 1
+    ? { "1st Choice Compounding Pharmacy": "7–8 days" }
+    : undefined,
 }));
 
 const NASAL_SPRAY_CARDS: CardDef[] = NASAL_SPRAY_PRODUCT_SEEDS.map((product, index) => ({
@@ -3138,6 +3114,31 @@ function ManualCapsulePreview({
   );
 }
 
+function ProcessingDelayNotice({ delay, compact = false, className = "" }: { delay: string; compact?: boolean; className?: string }) {
+  if (compact) {
+    return (
+      <span className={`block whitespace-nowrap text-[11px] leading-[17px] text-[#c05c0a] ${className}`}>
+        <span className="font-medium">Delayed</span> · Est. ship in <span className="font-semibold tabular-nums">{delay}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={`flex items-center gap-2.5 rounded-[8px] bg-[#fff8ec] px-3 py-2.5 ${className}`}>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#a36b19]">
+        <Clock size={16} strokeWidth={1.7} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-semibold leading-4 text-[#6b4e22]">Processing delay</span>
+        <span className="mt-0.5 block text-[10px] leading-[14px] text-[#806b4d]">Estimated time to ship</span>
+      </span>
+      <span className="shrink-0 whitespace-nowrap rounded-full bg-[#ffedc9] px-2.5 py-1 text-[11px] font-semibold leading-4 tabular-nums text-[#805619]">
+        {delay}
+      </span>
+    </span>
+  );
+}
+
 function ProductDetailPage({
   onNavigate,
   cartMode,
@@ -3271,9 +3272,9 @@ function ProductDetailPage({
   const strengthPriceAdjustment = (Math.max(strengthOptions.indexOf(strength), 0) - Math.max(strengthOptions.indexOf(defaultStrength), 0)) * 5;
   const configurationPriceAdjustment = sizePriceAdjustment + strengthPriceAdjustment;
   const pharmacies = [
-    { name: is503B ? "1st Choice Compounding Pharmacy" : product.pharmacy, turnaround: "1-2 business days", price: baseProductPrice },
-    { name: !is503B && product.pharmacy === "Rush Pharmacy FL" ? "Optimal Balance Pharmacy" : "Rush Pharmacy FL", turnaround: "1-2 business days", price: baseProductPrice + 20 },
-  ];
+    { name: is503B ? "1st Choice Compounding Pharmacy" : product.pharmacy, turnaround: "1–2 days", price: baseProductPrice },
+    { name: !is503B && product.pharmacy === "Rush Pharmacy FL" ? "Optimal Balance Pharmacy" : "Rush Pharmacy FL", turnaround: "1–2 days", price: baseProductPrice + 20 },
+  ].map(option => ({ ...option, processingDelay: product.processingDelayByPharmacy?.[option.name] }));
   const selectedPharmacy = pharmacies.find(option => option.name === pharmacy) ?? pharmacies[0];
   // Demo enrollment is specific to the pharmacy; replace with the doctor's account status.
   const enrolled503BPharmacies = completedEnrollments;
@@ -3562,7 +3563,7 @@ function ProductDetailPage({
                   ? "border-2 border-[#171a20] bg-white"
                   : "border-[#183229] bg-[#eef7f2] shadow-[0_8px_18px_rgba(24,50,41,0.08)]";
                 return (
-                  <button key={option.name} onClick={() => { setPharmacy(option.name); setEnrollmentFormOpen(false); setAddedItemCount(null); }} className={`relative grid w-full grid-cols-[minmax(0,1fr)_90px] items-center border px-3 text-left transition-colors ${isReferenceStyle ? "min-h-[58px] rounded-[8px] py-2.5" : "rounded-[8px] py-3"} ${selected && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : selected ? outlineSelected : "border-[#bdbdbd] bg-white hover:border-[#555]"}`}>
+                  <button key={option.name} type="button" aria-pressed={selected} onClick={() => { setPharmacy(option.name); setEnrollmentFormOpen(false); setAddedItemCount(null); }} className={`relative grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border px-3 text-left transition-colors ${isReferenceStyle ? "min-h-[58px] rounded-[8px] py-2.5" : "rounded-[8px] py-3"} ${selected && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : selected ? outlineSelected : "border-[#bdbdbd] bg-white hover:border-[#555]"}`}>
                     {selected && isReferenceStyle && <CheckCircle2 size={18} strokeWidth={2.2} className={`absolute -right-2 -top-2 text-white ${isBlueReference ? "fill-[#2563EB]" : "fill-black"}`} />}
                     <span className="min-w-0">
                       <span className={`flex items-center gap-1.5 truncate text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>
@@ -3579,8 +3580,11 @@ function ProductDetailPage({
                     </span>
                     <span className="text-right">
                       <span className={`block text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>${Math.max(0, option.price + configurationPriceAdjustment).toFixed(2)}</span>
-                      <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>1–2 Days Processing</span>
+                      <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${selected && productDetailVariant === 2 ? "text-white/70" : option.processingDelay ? "font-medium text-[#92400e]" : "text-[#777]"}`}>{option.processingDelay ?? option.turnaround} processing</span>
                     </span>
+                    {option.processingDelay && (
+                      <ProcessingDelayNotice delay={option.processingDelay} className="col-span-2 mt-3" />
+                    )}
                   </button>
                 );
               })}
@@ -4124,7 +4128,7 @@ const ORDERS = [
     ],
     clinic: { name: "ScriptLinkRx Demo", address: "2823 Middletown Road Line 2, Bronx, NY 10461", phone: "(646)-617-9881" },
     items: [
-	      { patientName: "Zeee Rabushaj", name: "Tirzepatide/Pyridoxine (B6)", description: "1 (0.5mL) Vial | 20mg/25mg/mL", pharmacy: "1st Choice Compounding Pharmacy", tracking: "Tracking Not Ready", qty: 1, authRefills: 1, refillsLeft: 0, daysSupply: 1, price: "$125.43", image: blankVialReference },
+	      { patientName: "Zeee Rabushaj", name: "Tirzepatide/Pyridoxine (B6)", description: "1 (0.5mL) Vial | 20mg/25mg/mL", pharmacy: "1st Choice Compounding Pharmacy", tracking: "Tracking Not Ready", processingDelay: "7–8 days", qty: 1, authRefills: 1, refillsLeft: 0, daysSupply: 1, price: "$125.43", image: blankVialReference },
 	      { patientName: "Zeee Rabushaj", name: "5-Amino-1mq/NMN", description: "30 Capsules | 25mg/500mg", pharmacy: "1st Choice Compounding Pharmacy", tracking: "Tracking Not Ready", qty: 30, authRefills: 1, refillsLeft: 0, daysSupply: 1, price: "$171.80", image: img431 },
 	      { patientName: "Altin Selimi", name: "Bremelanotide (PT-141)", description: "1 (10mL) Bottle | 10mg/mL", pharmacy: "Precision Compounding Pharmacy", tracking: "Tracking Not Ready", qty: 1, authRefills: 1, refillsLeft: 0, daysSupply: 1, price: "$118.80", image: imgProduct452 },
 	      { patientName: "Altin Selimi", name: "Aminoblend", description: "1 (30mL) Vial | 100mg/50mg/50mg/50mg/100mg/mL", pharmacy: "Thesis Pharmacy", tracking: "Tracking Not Ready", qty: 1, authRefills: 2, refillsLeft: 0, daysSupply: 1, price: "$35.99", image: img432 },
@@ -4194,6 +4198,11 @@ function CopyButton({ text }: { text: string }) {
       }
     </button>
   );
+}
+
+function OrderProcessingDelayNotice({ item, status }: { item: { tracking: string; processingDelay?: string }; status: string }) {
+  if (!item.processingDelay || item.tracking !== "Tracking Not Ready" || ["Shipped", "Delivered", "Cancelled"].includes(status)) return null;
+  return <ProcessingDelayNotice delay={item.processingDelay} compact className="my-2 w-fit max-w-full" />;
 }
 
 function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: (p: Page) => void; onOrderSelect: (order: typeof ORDERS[number]) => void; extraVariants: boolean }) {
@@ -4406,6 +4415,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                             <p className="mt-1 truncate text-[11px] text-[#444]">{patient.address}</p>
                           </div>
                           <div className="min-w-0">
+                            <OrderProcessingDelayNotice item={item} status={order.status} />
                             <p className="truncate text-[12px] font-normal text-[#777]">{item.pharmacy}</p>
                             <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold ${trackingBlue ? "bg-[#F6F6FF] text-[#4169E8]" : "bg-[#ECEBE3] text-[#2f3d35]"}`}>
                               {trackingBlue && <Send size={13} strokeWidth={1.8} />}
@@ -4533,6 +4543,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
 	                                      <span className="rounded-full bg-white px-2 py-1 text-[9px] text-[#555]">Refills {item.refillsLeft}</span>
 	                                      <span className="rounded-full bg-white px-2 py-1 text-[9px] text-[#555]">Days {item.daysSupply}</span>
 	                                    </div>
+	                                    <OrderProcessingDelayNotice item={item} status={order.status} />
 	                                    <div className="mt-3 flex flex-wrap items-center gap-2">
 	                                      <p className="truncate text-[11px] text-[#777]">{item.pharmacy}</p>
 	                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-semibold ${(groupIndex + index) % 2 === 1 ? "bg-[#F6F6FF] text-[#4169E8]" : "bg-[#ECEBE3] text-[#2f3d35]"}`}>
@@ -4619,6 +4630,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                             <span className="shrink-0 text-[12px] font-bold text-[#1a1a1a]">{item.price}</span>
                           </div>
                           <p className="mt-1 text-[11px] text-[#6f7782]">{item.description}</p>
+                          <OrderProcessingDelayNotice item={item} status={order.status} />
                           <p className="mt-1 text-[10px] text-[#8c95a1]">{item.pharmacy}</p>
                           <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ${item.tracking === "Tracking Not Ready" ? "bg-[#E8E5B0] text-[#31583F]" : "bg-[#C5F5DD] text-[#31583F]"}`}>{labelCase(item.tracking)}</span>
                           <p className="mt-2 text-[10px] text-[#8c95a1]">Qty {quantities[`${order.id}-${index}`] ?? item.qty} · Refills {item.authRefills} · Days {item.daysSupply}</p>
@@ -4659,6 +4671,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                             <div className="min-w-0">
                               <p className="text-[12px] font-semibold text-[#1a1a1a]">{item.name}</p>
                               <p className="mt-0.5 text-[11px] text-[#6f7782]">{item.description}</p>
+                              <OrderProcessingDelayNotice item={item} status={order.status} />
                               <p className="mt-1 text-[10px] text-[#8c95a1]">{item.pharmacy}</p>
                               {orderCardVariant === "silver" ? <span className="mt-1.5 inline-flex items-center gap-1.5 text-[9px] font-medium text-[#98A2B3]"><Clock size={11} strokeWidth={1.5} />{labelCase(item.tracking)}</span> : <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ${item.tracking === "Tracking Not Ready" ? "bg-[#E8E5B0] text-[#31583F]" : "bg-[#C5F5DD] text-[#31583F]"}`}>{labelCase(item.tracking)}</span>}
                               <p className="mt-1 text-[10px] text-[#8c95a1]">Qty {quantities[`${order.id}-${index}`] ?? item.qty} · Auth refills {item.authRefills} · Refills left {item.refillsLeft} · Days {item.daysSupply}</p>
@@ -4799,6 +4812,7 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
                             {!isSupply && <span className="inline-flex rounded-full bg-gradient-to-r from-[#FFE2D2] to-[#FFF45C] px-2 py-0.5 text-[9px] font-semibold text-[#56203B]">Open Rx</span>}
                           </div>
                           <p className="mt-1 text-[11px] text-[#667085]">{item.description}</p>
+                          <OrderProcessingDelayNotice item={item} status={order.status} />
                           {!isSupply && <><p className="mt-2 text-[10px] text-[#161a18]"><strong>Sig:</strong> Use as directed by prescriber.</p><p className="mt-1 text-[10px] text-[#161a18]"><strong>Reason:</strong> Patient requires a customized compounded formulation.</p></>}
                           {isSupply && <p className="mt-1 text-[10px] text-[#8c95a1]">Suitable amount</p>}
                         </div>
@@ -9600,22 +9614,22 @@ function MultiPatientCartPage({
                     }`}
                   >
                     {cartCardVariant === 5 && !showBoomCompletedCard && (
-                      <div className="mb-4 hidden grid-cols-[minmax(270px,1fr)_210px_112px_90px] gap-5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c88] lg:grid">
+                      <div className="mb-4 hidden grid-cols-[minmax(0,1fr)_180px_114px_140px] gap-5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c88] lg:grid">
                         <span>Product Details</span>
                         <span>Patient</span>
-                        <span className="text-center">Qty</span>
-                        <span className="text-right">Price</span>
+                        <span className="w-28 text-center">Qty</span>
+                        <span className="pr-12 text-right">Price</span>
                       </div>
                     )}
 
-                    {!showBoomCompletedCard && <div className={cartCardVariant === 3 ? "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(250px,1fr)_210px_90px_66px] lg:items-start" : "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(270px,1fr)_210px_112px_90px] lg:items-start"}>
+                    {!showBoomCompletedCard && <div className={cartCardVariant === 3 ? "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_180px_90px_108px] lg:items-start" : "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_180px_114px_140px] lg:items-start"}>
                       <div className="flex min-w-0 gap-4">
                         <CartItemImage item={item} />
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="whitespace-nowrap text-[14px] font-semibold leading-tight text-[#191919]">{item.name}</p>
+                            <p className="break-words text-[14px] font-semibold leading-snug text-[#191919]">{item.name}</p>
                           </div>
-                          <p className="mt-1 whitespace-nowrap text-[13px] text-[#858585]">{item.detail}</p>
+                          <p className="mt-1 break-words text-[13px] text-[#858585]">{item.detail}</p>
                           {addedPrescriptionIds.has(item.id) && <p className="mt-1.5 whitespace-nowrap text-[12px] font-medium text-[#2f7a43]">Prescription complete</p>}
                           {includedSupplies.length > 0 && (
                             <button onClick={() => toggleSupplies(item.id)} className="mt-2 inline-flex whitespace-nowrap items-center gap-1 text-[12px] text-[#666] underline underline-offset-4">
@@ -9632,17 +9646,20 @@ function MultiPatientCartPage({
                         <p>{patient.phone}</p>
                       </div>
 
-                      <div className={cartCardVariant === 3 ? "inline-flex h-8 w-fit items-center overflow-hidden rounded-full border border-[#e2e2e2] bg-white" : "inline-flex h-10 w-fit items-center overflow-hidden rounded-full border border-[#e2e2e2] bg-white"}>
-                        {(quantities[item.id] ?? 1) === 1 ? (
-                          <button onClick={() => removeItem(item.id)} className={cartCardVariant === 3 ? "flex h-8 w-8 items-center justify-center text-[#202020] hover:bg-[#f7f7f7]" : "flex h-10 w-10 items-center justify-center text-[#202020] hover:bg-[#f7f7f7]"} aria-label={"Remove " + item.name}><Trash2 size={cartCardVariant === 3 ? 12 : 15} /></button>
-                        ) : (
-                          <button onClick={() => adjust(item.id, -1)} className={cartCardVariant === 3 ? "flex h-8 w-8 items-center justify-center text-[#202020] hover:bg-[#f7f7f7]" : "flex h-10 w-10 items-center justify-center text-[#202020] hover:bg-[#f7f7f7]"} aria-label={"Decrease " + item.name}><Minus size={cartCardVariant === 3 ? 12 : 16} /></button>
-                        )}
-                        <span className={cartCardVariant === 3 ? "flex h-8 w-6 items-center justify-center text-[11px] font-medium" : "flex h-10 w-8 items-center justify-center text-[13px] font-medium"}>{quantities[item.id] ?? 1}</span>
-                        <button onClick={() => adjust(item.id, 1)} className={cartCardVariant === 3 ? "flex h-8 w-8 items-center justify-center text-[#202020] hover:bg-[#f7f7f7]" : "flex h-10 w-10 items-center justify-center text-[#202020] hover:bg-[#f7f7f7]"} aria-label={"Increase " + item.name}><Plus size={cartCardVariant === 3 ? 12 : 16} /></button>
+                      <div className="flex w-fit items-center gap-2">
+                        <div className={cartCardVariant === 3 ? "inline-flex h-8 items-center overflow-hidden rounded-full border border-[#e2e2e2] bg-white" : "inline-flex h-10 items-center overflow-hidden rounded-full border border-[#e2e2e2] bg-white"}>
+                          <button type="button" onClick={() => adjust(item.id, -1)} disabled={(quantities[item.id] ?? 1) <= 1} className={`flex shrink-0 items-center justify-center text-[#202020] transition-colors hover:bg-[#f7f7f7] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${cartCardVariant === 3 ? "h-8 w-8" : "h-10 w-10"}`} aria-label={"Decrease quantity for " + item.name}><Minus size={cartCardVariant === 3 ? 12 : 16} /></button>
+                          <span className={cartCardVariant === 3 ? "flex h-8 min-w-6 items-center justify-center px-0.5 text-[11px] font-medium tabular-nums" : "flex h-10 min-w-8 items-center justify-center px-0.5 text-[13px] font-medium tabular-nums"}>{quantities[item.id] ?? 1}</span>
+                          <button type="button" onClick={() => adjust(item.id, 1)} className={`flex shrink-0 items-center justify-center text-[#202020] transition-colors hover:bg-[#f7f7f7] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-black ${cartCardVariant === 3 ? "h-8 w-8" : "h-10 w-10"}`} aria-label={"Increase quantity for " + item.name}><Plus size={cartCardVariant === 3 ? 12 : 16} /></button>
+                        </div>
                       </div>
 
-                      <p className={cartCardVariant === 3 ? "pt-1 text-right text-[12px] font-medium text-[#171717]" : "pt-2 text-right text-[14px] font-medium text-[#171717]"}>{item.price === 0 ? "Free" : "$" + (item.price * (quantities[item.id] ?? 1)).toFixed(2)}</p>
+                      <div className="flex items-center justify-end gap-2">
+                        <p className={cartCardVariant === 3 ? "whitespace-nowrap text-right text-[12px] font-medium tabular-nums text-[#171717]" : "whitespace-nowrap text-right text-[14px] font-medium tabular-nums text-[#171717]"}>{item.price === 0 ? "Free" : "$" + (item.price * (quantities[item.id] ?? 1)).toFixed(2)}</p>
+                        <button type="button" onClick={() => removeItem(item.id)} className={`flex shrink-0 items-center justify-center text-[#777] transition-colors hover:text-[#c2413b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black ${cartCardVariant === 3 ? "size-8" : "size-10"}`} aria-label={"Remove " + item.name + " from cart"} title="Remove item">
+                          <Trash2 size={cartCardVariant === 3 ? 13 : 15} strokeWidth={1.8} />
+                        </button>
+                      </div>
                     </div>}
 
                     {!showBoomCompletedCard && expandedSupplies.has(item.id) && includedSupplies.length > 0 && (
@@ -9657,7 +9674,7 @@ function MultiPatientCartPage({
                         addedPrescriptionIds.has(item.id) ? (
                           cartCardVariant === 3 ? (
                             <div className="rounded-[6px] border border-[#E1E3E6] bg-white">
-                              <div className="grid grid-cols-1 gap-5 px-5 py-5 md:grid-cols-[minmax(210px,1fr)_minmax(210px,1fr)_150px_54px] md:items-start">
+                              <div className="grid grid-cols-1 gap-5 px-5 py-5 md:grid-cols-[minmax(210px,1fr)_minmax(210px,1fr)_150px_80px] md:items-start">
                                 <div className="flex min-w-0 gap-3">
                                   <CartItemImage item={item} />
                                   <div className="min-w-0">
@@ -9679,12 +9696,15 @@ function MultiPatientCartPage({
                                   <p className="text-[13px] font-semibold text-[#171717]">{item.price === 0 ? "Free" : "$" + item.price.toFixed(2)}</p>
                                   <span className="text-[12px] font-semibold text-[#171717]">×</span>
                                   <div className="inline-flex h-8 w-fit items-center overflow-hidden rounded-[5px] bg-[#EEF0F2]">
-                                    <button onClick={() => adjust(item.id, -1)} className="flex h-8 w-8 items-center justify-center text-[#333] hover:bg-[#e2e4e7]" aria-label={"Decrease " + item.name}><Minus size={12} /></button>
+                                    <button type="button" onClick={() => adjust(item.id, -1)} disabled={(quantities[item.id] ?? 1) <= 1} className="flex h-8 w-8 items-center justify-center text-[#333] hover:bg-[#e2e4e7] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent" aria-label={"Decrease " + item.name}><Minus size={12} /></button>
                                     <span className="flex h-8 w-8 items-center justify-center text-[11px] font-medium">{quantities[item.id] ?? 1}</span>
                                     <button onClick={() => adjust(item.id, 1)} className="flex h-8 w-8 items-center justify-center text-[#333] hover:bg-[#e2e4e7]" aria-label={"Increase " + item.name}><Plus size={12} /></button>
                                   </div>
                                 </div>
                                 <div className="flex items-start justify-end gap-3">
+                                  <button type="button" onClick={() => removeItem(item.id)} className="text-[#777] transition-colors hover:text-[#c2413b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black" aria-label={"Remove " + item.name + " from cart"} title="Remove item">
+                                    <Trash2 size={15} strokeWidth={1.8} />
+                                  </button>
                                   <button onClick={() => setExpandedPrescriptionIds(current => cartCardVariant === 3 || cartCardVariant === 4 || cartCardVariant === 5 || cartCardVariant === 6 ? new Set([item.id]) : new Set([...current, item.id]))} className="text-[#183229] hover:text-black" aria-label="Edit prescription">
                                     <Edit3 size={14} />
                                   </button>
@@ -12365,7 +12385,9 @@ export default function App() {
   const [cartConflict, setCartConflict] = useState<CartConflict | null>(null);
   const activeCartCatalogType = getCartCatalogType(cartPreviewItems);
   const [appLoading, setAppLoading] = useState(false);
-  const [appToast, setAppToast] = useState<{ id: number; type: "success" | "error"; message: string } | null>(null);
+  const [appToast, setAppToast] = useState<ToastMessage | null>(null);
+  const toastIdRef = useRef(0);
+  const dismissToast = useCallback(() => setAppToast(null), []);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const [chatMuted, setChatMuted] = useState(false);
@@ -12623,12 +12645,8 @@ export default function App() {
     }, delayMs);
   }
 
-  function showToast(message: string, type: "success" | "error" = "success") {
-    const id = Date.now();
-    setAppToast({ id, type, message });
-    window.setTimeout(() => {
-      setAppToast((current) => current?.id === id ? null : current);
-    }, 4200);
+  function showToast(message: string, type: ToastType = "success") {
+    setAppToast({ id: ++toastIdRef.current, type, message });
   }
 
   function renderPage() {
@@ -12913,7 +12931,7 @@ export default function App() {
             </div>
           </div>
           <AppActionOverlay active={appLoading} />
-          <AppToast toast={appToast} onClose={() => setAppToast(null)} />
+          {appToast && <AppToast key={appToast.id} toast={appToast} onClose={dismissToast} />}
           {cartConflict && <CartConflictModal conflict={cartConflict} onClose={() => setCartConflict(null)} onClear={() => {
             clearCartItems();
             setCartConflict(null);
