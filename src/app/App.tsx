@@ -1,5 +1,6 @@
 import { EnrollmentModal } from "./EnrollmentModal";
 import { CartConflictModal } from "./CartConflictModal";
+import { ErrorPage, type ErrorPageKind } from "./ErrorPage";
 import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
 import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType, type CartConflict } from "./cart-rules";
 import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
@@ -135,6 +136,7 @@ type Page =
   | "orders"
   | "order-detail"
   | "order-history"
+  | ErrorPageKind
   | "pending-approvals"
   | "support"
   | "users"
@@ -149,6 +151,15 @@ type CartMode = "single" | "multi";
 type CheckoutSubmissionState = "idle" | "submitting" | "submitted";
 
 const DEFAULT_PAGE: Page = "products";
+
+function pageFromLink(hash: string): Page | null {
+  switch (hash) {
+    case "#/404": return "not-found";
+    case "#/something-went-wrong": return "something-went-wrong";
+    case "#/order-history": return "order-history";
+    default: return null;
+  }
+}
 
 function CheckoutSubmissionFooter({
   state,
@@ -3124,15 +3135,20 @@ function ProcessingDelayNotice({ delay, compact = false, className = "" }: { del
   }
 
   return (
-    <span className={`flex items-center gap-2.5 rounded-[8px] bg-[#fff8ec] px-3 py-2.5 ${className}`}>
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[#a36b19]">
-        <Clock size={16} strokeWidth={1.7} aria-hidden="true" />
+    <span className={`relative isolate flex flex-wrap items-center justify-between gap-x-3 gap-y-2 overflow-hidden rounded-[10px] border border-[#e8e5e1] bg-white px-2.5 py-2 shadow-[0_1px_4px_rgba(60,40,20,0.08)] ${className}`}>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{ backgroundImage: "linear-gradient(90deg, #fff 0%, #fff 30%, rgba(255,255,255,0) 100%), repeating-linear-gradient(135deg, #fff3e9 0px, #fff3e9 6px, #ffe3cc 6px, #ffe3cc 12px)" }}
+      />
+      <span className="flex min-w-0 items-center gap-2.5">
+        <TriangleAlert size={22} strokeWidth={2} className="shrink-0 text-[#b76a08]" aria-hidden="true" />
+        <span className="min-w-0">
+          <span className="block text-[11px] font-semibold leading-4 text-[#3f3b36]">Processing delay</span>
+          <span className="block text-[10px] leading-[15px] text-[#817b75]">Estimated time to ship</span>
+        </span>
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[11px] font-semibold leading-4 text-[#6b4e22]">Processing delay</span>
-        <span className="mt-0.5 block text-[10px] leading-[14px] text-[#806b4d]">Estimated time to ship</span>
-      </span>
-      <span className="shrink-0 whitespace-nowrap rounded-full bg-[#ffedc9] px-2.5 py-1 text-[11px] font-semibold leading-4 tabular-nums text-[#805619]">
+      <span className="shrink-0 whitespace-nowrap rounded-[5px] border border-[#eee5dc] bg-white px-2 py-0.5 text-[11px] font-medium leading-4 tabular-nums text-[#5a5047] shadow-[0_1px_2px_rgba(60,40,20,0.06)]">
         {delay}
       </span>
     </span>
@@ -3563,10 +3579,10 @@ function ProductDetailPage({
                   ? "border-2 border-[#171a20] bg-white"
                   : "border-[#183229] bg-[#eef7f2] shadow-[0_8px_18px_rgba(24,50,41,0.08)]";
                 return (
-                  <button key={option.name} type="button" aria-pressed={selected} onClick={() => { setPharmacy(option.name); setEnrollmentFormOpen(false); setAddedItemCount(null); }} className={`relative grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border px-3 text-left transition-colors ${isReferenceStyle ? "min-h-[58px] rounded-[8px] py-2.5" : "rounded-[8px] py-3"} ${selected && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : selected ? outlineSelected : "border-[#bdbdbd] bg-white hover:border-[#555]"}`}>
+                  <button key={option.name} type="button" aria-pressed={selected} onClick={() => { setPharmacy(option.name); setEnrollmentFormOpen(false); setAddedItemCount(null); }} className={`relative grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 border px-3 text-left transition-colors ${isReferenceStyle ? "min-h-[58px] rounded-[8px] py-2.5" : "rounded-[8px] py-3"} ${selected && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : selected ? outlineSelected : "border-[#bdbdbd] bg-white hover:border-[#555]"}`}>
                     {selected && isReferenceStyle && <CheckCircle2 size={18} strokeWidth={2.2} className={`absolute -right-2 -top-2 text-white ${isBlueReference ? "fill-[#2563EB]" : "fill-black"}`} />}
                     <span className="min-w-0">
-                      <span className={`flex items-center gap-1.5 truncate text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>
+                      <span className={`flex items-center gap-1.5 text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>
                         {selected && productDetailVariant === 2 && <CheckCircle2 size={13} className="shrink-0 text-white" />}
                         {option.name}
                       </span>
@@ -3580,10 +3596,10 @@ function ProductDetailPage({
                     </span>
                     <span className="text-right">
                       <span className={`block text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>${Math.max(0, option.price + configurationPriceAdjustment).toFixed(2)}</span>
-                      <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${selected && productDetailVariant === 2 ? "text-white/70" : option.processingDelay ? "font-medium text-[#92400e]" : "text-[#777]"}`}>{option.processingDelay ?? option.turnaround} processing</span>
+                      {!option.processingDelay && <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>{option.turnaround} processing</span>}
                     </span>
                     {option.processingDelay && (
-                      <ProcessingDelayNotice delay={option.processingDelay} className="col-span-2 mt-3" />
+                      <ProcessingDelayNotice delay={option.processingDelay} className="col-span-2 mt-2.5" />
                     )}
                   </button>
                 );
@@ -4963,6 +4979,7 @@ interface OrderHistoryEntry {
   refunded_amount: number;
   net_paid: number;
   payment_timestamp: string | null;
+  errorPage?: ErrorPageKind;
 }
 
 const orderHistoryDaysAgo = (days: number, hour = 10, minute = 24) => {
@@ -4973,9 +4990,9 @@ const orderHistoryDaysAgo = (days: number, hour = 10, minute = 24) => {
 };
 
 const ORDER_HISTORY_ENTRIES: OrderHistoryEntry[] = [
-  { order_id: "8f2c91d34a6e47b1905cfd12e8a3f82c9a3f82c1", created_at: orderHistoryDaysAgo(0, 9, 14), patient_name: "Sarah Mitchell", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "pending_payment", payment_method: "patient", is_paid: false, is_cancelled: false, total_price: 215.98, refunded_amount: 0, net_paid: 0, payment_timestamp: null },
+  { order_id: "8f2c91d34a6e47b1905cfd12e8a3f82c9a3f82c1", created_at: orderHistoryDaysAgo(0, 9, 14), patient_name: "Sarah Mitchell", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "pending_payment", payment_method: "patient", is_paid: false, is_cancelled: false, total_price: 215.98, refunded_amount: 0, net_paid: 0, payment_timestamp: null, errorPage: "not-found" },
   { order_id: "1d84f7a2c95b40e3871a6f0d24b7c1e94d67b2e0", created_at: orderHistoryDaysAgo(1, 15, 42), patient_name: "", is_multi_patient: true, order_type: "order", is_custom: false, order_status: "processing", payment_method: "clinic", is_paid: true, is_cancelled: false, total_price: 431.96, refunded_amount: 0, net_paid: 431.96, payment_timestamp: orderHistoryDaysAgo(1, 15, 44) },
-  { order_id: "6b09e3d18f4a42c7953e2a8b06d1f7358c2ad490", created_at: orderHistoryDaysAgo(2, 11, 8), patient_name: "David Lim", is_multi_patient: false, order_type: "refill", is_custom: false, order_status: "shipped", payment_method: "clinic_ach", is_paid: true, is_cancelled: false, total_price: 55.88, refunded_amount: 0, net_paid: 55.88, payment_timestamp: orderHistoryDaysAgo(2, 11, 9) },
+  { order_id: "6b09e3d18f4a42c7953e2a8b06d1f7358c2ad490", created_at: orderHistoryDaysAgo(2, 11, 8), patient_name: "David Lim", is_multi_patient: false, order_type: "refill", is_custom: false, order_status: "shipped", payment_method: "clinic_ach", is_paid: true, is_cancelled: false, total_price: 55.88, refunded_amount: 0, net_paid: 55.88, payment_timestamp: orderHistoryDaysAgo(2, 11, 9), errorPage: "something-went-wrong" },
   { order_id: "4e71a0c58d2b46f9812c5e3a97b0d64125f8ce37", created_at: orderHistoryDaysAgo(4, 14, 31), patient_name: "Maria Santos", is_multi_patient: false, order_type: "order", is_custom: true, order_status: "delivered", payment_method: "patient", is_paid: true, is_cancelled: false, total_price: 189.5, refunded_amount: 0, net_paid: 189.5, payment_timestamp: orderHistoryDaysAgo(4, 14, 35) },
   { order_id: "9c35b8e07f1d49a2864b0d7c53e9a18670e4b9a5", created_at: orderHistoryDaysAgo(6, 10, 2), patient_name: "John Reynolds", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "cancelled", payment_method: "clinic", is_paid: true, is_cancelled: true, total_price: 65.99, refunded_amount: 65.99, net_paid: 0, payment_timestamp: orderHistoryDaysAgo(6, 10, 5) },
   { order_id: "2a68d4f19c0e47b5923f8a1d65c0b39784c1d5f8", created_at: orderHistoryDaysAgo(8, 16, 55), patient_name: "Allison Johnson", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "delivered", payment_method: "clinic", is_paid: true, is_cancelled: false, total_price: 145.0, refunded_amount: 25.0, net_paid: 120.0, payment_timestamp: orderHistoryDaysAgo(8, 17, 1) },
@@ -5192,6 +5209,7 @@ function OrderHistoryDateInput({ label, value, onChange, min, max }: { label: st
 
 function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const { showToast } = useAppLoading();
+  const [errorPage, setErrorPage] = useState<ErrorPageKind | null>(null);
   const [historyVersion, setHistoryVersion] = useState<"current" | "v2">("v2");
   const [rangePreset, setRangePreset] = useState("this_month");
   const [customStart, setCustomStart] = useState("");
@@ -5238,6 +5256,18 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   }
 
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  function openPatientOrder(order: OrderHistoryEntry) {
+    if (order.errorPage) {
+      setErrorPage(order.errorPage);
+      return;
+    }
+    onNavigate("orders");
+  }
+
+  if (errorPage) {
+    return <ErrorPage kind={errorPage} onHome={() => onNavigate("products")} />;
+  }
 
   return (
     <>
@@ -5315,14 +5345,16 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   {orders.map(order => (
                     <tr
                       key={order.order_id}
-                      onClick={() => onNavigate("orders")}
+                      onClick={() => openPatientOrder(order)}
                       className={`cursor-pointer transition-colors hover:bg-[#f1f1f1] ${historyVersion === "current" ? "even:bg-[#fbfbfb] even:hover:bg-[#f1f1f1]" : "even:bg-[#fafafa] even:hover:bg-[#f1f1f1]"}`}
                     >
                       {historyVersion === "v2" ? (
                         <>
                           <td className="px-4 py-3 text-[12px] font-normal text-[#121212]">
                             <span className="inline-flex flex-col items-start gap-0.5">
+                              <button type="button" onClick={event => { event.stopPropagation(); openPatientOrder(order); }} aria-label={`Open order for ${order.is_multi_patient ? "multiple patients" : order.patient_name || "patient"}`} className="rounded text-left text-[12px] font-normal decoration-[#bdbdb8] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2563eb]">
                               {order.is_multi_patient ? <span className="inline-flex items-center gap-1.5">Multiple patients <span className="rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[9px] text-[#666]">Group</span></span> : <span>{order.patient_name || "—"}</span>}
+                              </button>
                               <span className="text-[10px] font-normal leading-[13px] text-[#686868]">Order #{order.order_id.slice(-8).toUpperCase()}</span>
                             </span>
                           </td>
@@ -5344,7 +5376,7 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                         <>
                           <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]">{formatDate(order.created_at)}</td>
                           <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]">#{order.order_id.slice(-8).toUpperCase()}</td>
-                          <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]">{order.is_multi_patient ? "Multiple Patients" : order.patient_name || "—"}</td>
+                          <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]"><button type="button" onClick={event => { event.stopPropagation(); openPatientOrder(order); }} aria-label={`Open order for ${order.is_multi_patient ? "multiple patients" : order.patient_name || "patient"}`} className="rounded text-left text-[12px] font-medium decoration-[#bdbdb8] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2563eb]">{order.is_multi_patient ? "Multiple Patients" : order.patient_name || "—"}</button></td>
                           <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]">{order.is_custom ? "Custom" : order.order_type === "refill" ? "Refill" : "Order"}</td>
                           <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]"><OrderHistoryStatusChip status={order.order_status} /></td>
                           <td className="max-w-[500px] px-4 py-2.5 text-[12px] font-medium leading-5 text-[#121212]"><OrderHistoryPayByChip payBy={order.payment_method} /></td>
@@ -12358,9 +12390,9 @@ export default function App() {
   const [extraVariants, setExtraVariants] = useState(() => window.localStorage.getItem("scriptlinkrx-extra-variants") === "true");
   const [oldCatalog, setOldCatalog] = useState(() => window.localStorage.getItem("scriptlinkrx-old-catalog") === "true");
   const [pharmacyCatalog, setPharmacyCatalog] = useState(() => window.localStorage.getItem("scriptlinkrx-pharmacy-catalog") === "true");
-  const [page, setPage] = useState<Page>(DEFAULT_PAGE);
+  const [page, setPage] = useState<Page>(() => pageFromLink(window.location.hash) ?? DEFAULT_PAGE);
   const [pageLoading, setPageLoading] = useState(false);
-  const previousPageRef = useRef<Page>(DEFAULT_PAGE);
+  const previousPageRef = useRef<Page>(page);
   const [cartMode, setCartMode] = useState<CartMode>("single");
   const [multiCartPatientIds, setMultiCartPatientIds] = useState<number[]>([]);
   const [patientCartEntries, setPatientCartEntries] = useState<PatientCartEntry[]>([]);
@@ -12399,6 +12431,19 @@ export default function App() {
   const [platformTourTooltipVisible, setPlatformTourTooltipVisible] = useState(false);
   const [chatInput, setChatInput] = useState("");
 
+  useEffect(() => {
+    const openLinkedPage = () => setPage(pageFromLink(window.location.hash) ?? DEFAULT_PAGE);
+    window.addEventListener("hashchange", openLinkedPage);
+    return () => window.removeEventListener("hashchange", openLinkedPage);
+  }, []);
+
+  useEffect(() => {
+    const linkedPage = pageFromLink(window.location.hash);
+    if (linkedPage && linkedPage !== page) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+  }, [page]);
+
   useLayoutEffect(() => {
     if (previousPageRef.current === page) return;
     previousPageRef.current = page;
@@ -12412,7 +12457,7 @@ export default function App() {
   }, [page]);
 
   useLayoutEffect(() => {
-    if (page !== "product-detail") return;
+    if (!["product-detail", "order-history", "not-found", "something-went-wrong"].includes(page)) return;
     const scroller = mainScrollRef.current;
     if (!scroller) return;
     scroller.scrollTop = 0;
@@ -12678,6 +12723,9 @@ export default function App() {
         return <OrderDetailPage order={selectedOrder} onNavigate={setPage} />;
       case "order-history":
         return <OrderHistoryPage onNavigate={setPage} />;
+      case "not-found":
+      case "something-went-wrong":
+        return <ErrorPage kind={page} onHome={() => setPage("products")} />;
       case "pending-approvals":
         return <PendingApprovalsPage onNavigate={setPage} />;
       case "support":
@@ -12813,7 +12861,7 @@ export default function App() {
           <div className={`app-theme app-theme-${appTheme} flex h-screen overflow-hidden bg-[var(--app-soft-hover)] font-['Inter',sans-serif]`}>
             {/* Sidebar Navigation */}
             <Sidebar
-              active={page}
+              active={page === "not-found" || page === "something-went-wrong" ? "order-history" : page}
               onNavigate={setPage}
               cartPage={cartPage}
               onLogout={() => {
