@@ -1,5 +1,7 @@
 import { EnrollmentModal } from "./EnrollmentModal";
 import { CartConflictModal } from "./CartConflictModal";
+import { CartVoucherField, OrderTotalVouchers } from "./CartVoucherField";
+import { getPatientVoucherSummaries, getVoucherDiscount, patientVoucherKey } from "./cart-vouchers";
 import { ErrorPage, type ErrorPageKind } from "./ErrorPage";
 import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
 import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType, type CartConflict } from "./cart-rules";
@@ -9228,6 +9230,8 @@ function MultiPatientCartPage({
   cartEntries,
   extraVariants,
   onUpdateEntryQuantity,
+  appliedVouchers,
+  setAppliedVouchers,
 }: {
   onNavigate: (p: Page) => void;
   cartMode: CartMode;
@@ -9236,6 +9240,8 @@ function MultiPatientCartPage({
   cartEntries: PatientCartEntry[];
   extraVariants: boolean;
   onUpdateEntryQuantity: (id: number, quantity: number) => void;
+  appliedVouchers: Record<string, string>;
+  setAppliedVouchers: Dispatch<SetStateAction<Record<string, string>>>;
 }) {
   const cartData = useMemo(() => cartEntries.length > 0
     ? {
@@ -9246,6 +9252,7 @@ function MultiPatientCartPage({
           const entries = cartEntries.filter(entry => entry.patientId === patientId && entry.qty > 0);
           const addressLines = patientId === null ? [PENDING_APPROVALS_CLINIC.address] : [patient.address1, patient.address2, `${patient.city}, ${patient.state} ${patient.zip}`].filter(Boolean);
           return {
+            id: patientId,
             name: `${patient.firstName} ${patient.lastName}`,
             dob: patient.birthDate,
             phone: patient.primaryPhone,
@@ -9284,8 +9291,6 @@ function MultiPatientCartPage({
   const [reviewVariant, setReviewVariant] = useState<"current" | "v1" | "v2">("v1");
   const [paymentMethod, setPaymentMethod] = useState<"patient" | "clinic">(cartEntries.some(entry => entry.catalogType === "503B") ? "clinic" : "patient");
   const [shipTo, setShipTo] = useState<"patient" | "clinic">("clinic");
-  const [voucherCode, setVoucherCode] = useState("");
-  const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [prescriptionDetails, setPrescriptionDetails] = useState<Record<number, { days: string; refills: string; directions: string; reason: string }>>({});
   const [prescriptionValidationAttempted, setPrescriptionValidationAttempted] = useState(false);
   const [addedPrescriptionIds, setAddedPrescriptionIds] = useState<Set<number>>(new Set());
@@ -9328,20 +9333,28 @@ function MultiPatientCartPage({
   const subtotal = cartData.patients.flatMap(p => p.items)
     .filter(i => !removed.has(i.id))
     .reduce((sum, i) => sum + i.price * (quantities[i.id] ?? 1), 0);
-  const voucherDiscount = appliedVoucher ? Math.min(subtotal * 0.1, 50) : 0;
+  const patientVouchers = getPatientVoucherSummaries(
+    cartEntries.filter(entry => !removed.has(entry.id)).map(entry => ({ ...entry, qty: quantities[entry.id] ?? entry.qty })),
+    appliedVouchers,
+  ).map(voucher => ({ ...voucher, name: cartData.patients.find(patient => patient.id === voucher.patientId)?.name ?? "Patient" }));
+  const usePatientVouchers = paymentMethod === "patient" && patientVouchers.length > 0;
+  const isMultiPatientVoucher = usePatientVouchers && patientVouchers.length > 1;
+  const sharedVoucherKey = usePatientVouchers && patientVouchers.length === 1 ? patientVouchers[0].key : "cart";
+  const appliedVoucher = appliedVouchers[sharedVoucherKey] ?? null;
+  const voucherLines = usePatientVouchers
+    ? patientVouchers.filter(voucher => voucher.code)
+    : appliedVoucher ? [{ key: "cart", name: "Voucher", code: appliedVoucher, discount: getVoucherDiscount(subtotal) }] : [];
+  const voucherDiscount = voucherLines.reduce((sum, voucher) => sum + voucher.discount, 0);
   const total = subtotal + shipping - voucherDiscount;
   const previewSubmitted = previewSubmissionState === "submitted";
 
-  function applyVoucher() {
-    const normalizedCode = voucherCode.trim().toUpperCase();
-    if (!normalizedCode) return;
-    setVoucherCode(normalizedCode);
-    setAppliedVoucher(normalizedCode);
-  }
-
-  function removeVoucher() {
-    setAppliedVoucher(null);
-    setVoucherCode("");
+  function updateVoucher(key: string, code: string | null) {
+    setAppliedVouchers(current => {
+      const next = { ...current };
+      if (code) next[key] = code;
+      else delete next[key];
+      return next;
+    });
   }
 
   function adjust(id: number, delta: number) {
@@ -9591,6 +9604,8 @@ function MultiPatientCartPage({
               const pharmacy = item.pharmacy ?? cartData.pharmacy;
               const isFirstInPharmacy = rowIndex === 0 || (cartRowsWithNumbers[rowIndex - 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
               const isLastInPharmacy = rowIndex === cartRowsWithNumbers.length - 1 || (cartRowsWithNumbers[rowIndex + 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
+              const patientVoucher = patientVouchers.find(voucher => voucher.patientId === patient.id);
+              const isFirstForPatient = cartRowsWithNumbers.findIndex(row => row.patient.id === patient.id) === rowIndex;
               const includedSupplies = patient.items.filter(supply => supply.kind === "supply" && !removed.has(supply.id));
               const isExpanded = !is503BCartItem(item) && expandedPrescriptionIds.has(item.id);
               const showBoomCompletedCard = cartCardVariant === 3 && addedPrescriptionIds.has(item.id) && !isExpanded;
@@ -10207,6 +10222,18 @@ function MultiPatientCartPage({
                       )}
                     </div>
                     )}
+                    {isMultiPatientVoucher && patientVoucher && isFirstForPatient && !is503BCartItem(item) && (
+                      <div className="mt-4 border-t border-[#efefef] pt-4 sm:ml-16">
+                        <CartVoucherField
+                          patientName={patient.name}
+                          appliedCode={patientVoucher.code}
+                          discount={patientVoucher.discount}
+                          itemCount={patient.items.filter(patientItem => !removed.has(patientItem.id) && patientItem.kind !== "supply").length}
+                          onApply={code => updateVoucher(patientVoucher.key, code)}
+                          onRemove={() => updateVoucher(patientVoucher.key, null)}
+                        />
+                      </div>
+                    )}
                   </article>
 
                   {isLastInPharmacy && !is503BCartItem(item) && (
@@ -10226,30 +10253,18 @@ function MultiPatientCartPage({
           <aside className={`self-start bg-white transition-opacity xl:sticky xl:top-6 ${hasFocusedOpenForm ? "opacity-55 hover:opacity-85" : ""}`}>
             <h2 className="text-[24px] font-normal text-[#171717]">Order Total</h2>
 
-            <div className="mt-5">
-              <div className="flex items-center justify-between">
-                <p className="text-[13px] font-semibold text-[#202020]">Do you have a Voucher Code?</p>
-                <ChevronDown size={17} className="rotate-180" />
+            {isMultiPatientVoucher ? (
+              <OrderTotalVouchers patients={patientVouchers} onChange={updateVoucher} />
+            ) : (
+              <div className="mt-5">
+                <CartVoucherField key={sharedVoucherKey} appliedCode={appliedVoucher} discount={voucherDiscount} onApply={code => updateVoucher(sharedVoucherKey, code)} onRemove={() => updateVoucher(sharedVoucherKey, null)} />
               </div>
-              <div className="mt-3 flex gap-2">
-                <div className={`flex h-[31px] min-w-0 flex-1 items-center rounded-[8px] bg-white px-3 shadow-[inset_0_1px_0_#9E9EA0,inset_-1px_0_0_#9E9EA0,inset_0_-1px_0_#9E9EA0,inset_1px_0_0_#9E9EA0] ${appliedVoucher ? "text-[#202020] shadow-[inset_0_0_0_1px_#93B4FF]" : "focus-within:shadow-[inset_0_0_0_1px_#183229]"}`}>
-                  <input
-                    value={voucherCode}
-                    onChange={event => { setVoucherCode(event.target.value); if (appliedVoucher) setAppliedVoucher(null); }}
-                    onKeyDown={event => { if (event.key === "Enter") applyVoucher(); }}
-                    placeholder="Enter voucher code"
-                    className="min-w-0 flex-1 bg-transparent text-[12px] font-medium uppercase outline-none placeholder:normal-case placeholder:text-[#999]"
-                  />
-                </div>
-                <button onClick={applyVoucher} disabled={Boolean(appliedVoucher) || !voucherCode.trim()} className="h-[31px] rounded-full border-0 bg-white px-5 text-[12px] font-medium text-[#666] shadow-[inset_0_1px_0_#9E9EA0,inset_-1px_0_0_#9E9EA0,inset_0_-1px_0_#9E9EA0,inset_1px_0_0_#9E9EA0] transition-colors hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-45">Apply</button>
-              </div>
-              {appliedVoucher && <p className="mt-2 text-[10px] font-medium text-[#202020]">Voucher applied — 10% off, up to $50.</p>}
-            </div>
+            )}
 
             <div className="mt-5 space-y-3 text-[12px] text-[#262626]">
               <div className="flex justify-between gap-4"><span>Subtotal</span><span>{"$" + subtotal.toFixed(2)}</span></div>
               <div className="flex justify-between gap-4"><span>Estimated Shipping & Handling</span><span>{"$" + shipping.toFixed(2)}</span></div>
-              {appliedVoucher && <div className="flex justify-between gap-4 font-medium text-[#2563EB]"><span>Voucher ({appliedVoucher})</span><span>−${voucherDiscount.toFixed(2)}</span></div>}
+              {voucherLines.length > 0 && <div className="flex justify-between gap-4 font-medium text-[#287343]"><span>{isMultiPatientVoucher ? "Patient vouchers" : `Voucher (${appliedVoucher})`}</span><span>−${voucherDiscount.toFixed(2)}</span></div>}
               <div className="flex justify-between gap-4"><span>Estimated Tax</span><span>—</span></div>
               <div className="flex justify-between gap-4 border-y border-[#ececec] py-4 text-[13px] font-semibold"><span>Total</span><span>{"$" + total.toFixed(2)}</span></div>
             </div>
@@ -10383,6 +10398,7 @@ function MultiPatientCartPage({
                     <div className="space-y-2.5 text-[12px]">
                       <div className="flex justify-between"><span className="text-[#737373]">Subtotal</span><span className="text-[#202020]">${subtotal.toFixed(2)}</span></div>
                       <div className="flex justify-between"><span className="text-[#737373]">Shipping &amp; handling</span><span className="text-[#202020]">{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span></div>
+                      {voucherLines.map(voucher => <div key={voucher.key} className="flex justify-between gap-3 text-[#287343]"><span className="min-w-0 break-words">{voucher.name} · {voucher.code}</span><span className="shrink-0">−${voucher.discount.toFixed(2)}</span></div>)}
                     </div>
                     <div className="my-4 border-t border-dashed border-[#cfcfcf]" />
                     <div className="flex items-center justify-between text-[15px] font-semibold text-[#171717]"><span>Total</span><span>${total.toFixed(2)}</span></div>
@@ -10536,6 +10552,7 @@ function MultiPatientCartPage({
               <div className="space-y-3 text-[13px]">
                 <div className="flex justify-between text-[#222]"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between text-[#222]"><span>Estimated Shipping &amp; Handling</span><span>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span></div>
+                {voucherLines.map(voucher => <div key={voucher.key} className="flex justify-between gap-3 text-[#287343]"><span className="min-w-0 break-words">{voucher.name} · {voucher.code}</span><span className="shrink-0">−${voucher.discount.toFixed(2)}</span></div>)}
                 <div className="flex justify-between border-y border-[#ededed] py-4 text-[14px] font-semibold text-[#1a1a1a]"><span>Total</span><span>${total.toFixed(2)}</span></div>
               </div>
             </section>
@@ -12396,6 +12413,17 @@ export default function App() {
   const [cartMode, setCartMode] = useState<CartMode>("single");
   const [multiCartPatientIds, setMultiCartPatientIds] = useState<number[]>([]);
   const [patientCartEntries, setPatientCartEntries] = useState<PatientCartEntry[]>([]);
+  const [cartVouchers, setCartVouchers] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const activeEntries = patientCartEntries.filter(entry => entry.qty > 0);
+    const activeKeys = new Set(activeEntries.map(entry => entry.patientId === null ? "cart" : patientVoucherKey(entry.patientId)));
+    if (activeEntries.length > 0) activeKeys.add("cart");
+    setCartVouchers(current => {
+      const retained = Object.entries(current).filter(([key]) => activeKeys.has(key));
+      return retained.length === Object.keys(current).length ? current : Object.fromEntries(retained);
+    });
+  }, [patientCartEntries]);
   const [selectedProduct, setSelectedProduct] = useState<CardDef>(POPULAR_CARDS[0]);
   const [productCatalogType, setProductCatalogType] = useState<"503A" | "503B" | undefined>();
   function selectProduct(product: CardDef) {
@@ -12736,7 +12764,7 @@ export default function App() {
         return <SettingsPage onNavigate={setPage} />;
       case "cart-single":
       case "cart-multi":
-        return <MultiPatientCartPage onNavigate={setPage} cartMode={activeCartCatalogType === "503B" ? "single" : cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key={activeCartCatalogType ?? "empty"} cartEntries={patientCartEntries.filter(entry => entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} />;
+        return <MultiPatientCartPage onNavigate={setPage} cartMode={activeCartCatalogType === "503B" ? "single" : cartMode} setCartMode={setCartMode} selectedPatientIds={multiCartPatientIds} key={activeCartCatalogType ?? "empty"} cartEntries={patientCartEntries.filter(entry => entry.qty > 0)} extraVariants={extraVariants} onUpdateEntryQuantity={updateCartEntryQuantity} appliedVouchers={cartVouchers} setAppliedVouchers={setCartVouchers} />;
       case "checkout-prescription":
         return <CheckoutPrescriptionPage onNavigate={setPage} />;
       default:
