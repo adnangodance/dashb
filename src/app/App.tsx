@@ -3137,21 +3137,17 @@ function ProcessingDelayNotice({ delay, compact = false, className = "" }: { del
   }
 
   return (
-    <span className={`relative isolate flex flex-wrap items-center justify-between gap-x-3 gap-y-2 overflow-hidden rounded-[10px] border border-[#e8e5e1] bg-white px-2.5 py-2 shadow-[0_1px_4px_rgba(60,40,20,0.08)] ${className}`}>
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{ backgroundImage: "linear-gradient(90deg, #fff 0%, #fff 30%, rgba(255,255,255,0) 100%), repeating-linear-gradient(135deg, #fff3e9 0px, #fff3e9 6px, #ffe3cc 6px, #ffe3cc 12px)" }}
-      />
+    <span className={`relative flex items-center rounded-[12px] border border-[#f1d894] bg-[#fffbea] px-2.5 py-2 ${className}`}>
       <span className="flex min-w-0 items-center gap-2.5">
-        <TriangleAlert size={22} strokeWidth={2} className="shrink-0 text-[#b76a08]" aria-hidden="true" />
-        <span className="min-w-0">
-          <span className="block text-[11px] font-semibold leading-4 text-[#3f3b36]">Processing delay</span>
-          <span className="block text-[10px] leading-[15px] text-[#817b75]">Estimated time to ship</span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-[#eeba48] bg-[#fffdf4] p-0.5" aria-hidden="true">
+          <span className="flex size-full items-center justify-center rounded-[7px] border border-[#f2cc75] bg-[#ffe4a0] text-[#3d3015]">
+            <TriangleAlert size={17} strokeWidth={2} />
+          </span>
         </span>
-      </span>
-      <span className="shrink-0 whitespace-nowrap rounded-[5px] border border-[#eee5dc] bg-white px-2 py-0.5 text-[11px] font-medium leading-4 tabular-nums text-[#5a5047] shadow-[0_1px_2px_rgba(60,40,20,0.06)]">
-        {delay}
+        <span className="min-w-0">
+          <span className="block text-[11px] font-semibold leading-4 text-[#3e3520]">Processing delay</span>
+          <span className="block text-[10px] leading-[15px] text-[#786b4c]">Estimated time to ship</span>
+        </span>
       </span>
     </span>
   );
@@ -3598,7 +3594,7 @@ function ProductDetailPage({
                     </span>
                     <span className="text-right">
                       <span className={`block text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>${Math.max(0, option.price + configurationPriceAdjustment).toFixed(2)}</span>
-                      {!option.processingDelay && <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>{option.turnaround} processing</span>}
+                      <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${option.processingDelay ? (selected && productDetailVariant === 2 ? "text-[#ffc34d]" : "text-[#c05c0a]") : selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>{option.processingDelay ?? option.turnaround} processing</span>
                     </span>
                     {option.processingDelay && (
                       <ProcessingDelayNotice delay={option.processingDelay} className="col-span-2 mt-2.5" />
