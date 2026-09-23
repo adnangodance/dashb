@@ -1,6 +1,10 @@
 import { EnrollmentModal } from "./EnrollmentModal";
+import { DEMO_EPCS_ACCOUNT, EpcsSyncNotice, type EpcsAccount, type EpcsProfile } from "./EpcsSyncNotice";
 import { CartConflictModal } from "./CartConflictModal";
 import { CartVoucherField, OrderTotalVouchers } from "./CartVoucherField";
+import { PatientEpcsStatus, PatientEpcsNotice, type EpcsStatus } from "./PatientEpcsStatus";
+import { DoseSpotStatusIndicator } from "./DoseSpotStatusIndicator";
+import { type DoseSpotSyncData } from "./dosespot-status";
 import { getPatientVoucherSummaries, getVoucherDiscount, patientVoucherKey } from "./cart-vouchers";
 import { ErrorPage, type ErrorPageKind } from "./ErrorPage";
 import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
@@ -106,7 +110,7 @@ import blankLyophilizedVialReference from "@/assets/blank-lyophilized-vial-refer
 import blankTopicalDropperReference from "@/assets/blank-topical-dropper-reference.png";
 import blankPatchPackageReference from "@/assets/blank-patch-package-reference.png";
 import blankCapsuleBottleReference from "@/assets/blank-capsule-bottle-reference.png";
-import productSupplyNeedle from "@/assets/product-supply-needle.png";
+import productSupplyPack from "@/assets/product-supply-pack.png";
 import pharmacyFirstChoice from "@/assets/pharmacies/first-choice.png";
 import pharmacyDca from "@/assets/pharmacies/dca.png";
 import pharmacyLush from "@/assets/pharmacies/lush.png";
@@ -155,7 +159,9 @@ type CheckoutSubmissionState = "idle" | "submitting" | "submitted";
 const DEFAULT_PAGE: Page = "products";
 
 function pageFromLink(hash: string): Page | null {
+  if (/^#\/patients(?:\/\d+)?$/.test(hash)) return "users";
   switch (hash) {
+    case "#/settings/prescribers": return "settings";
     case "#/404": return "not-found";
     case "#/something-went-wrong": return "something-went-wrong";
     case "#/order-history": return "order-history";
@@ -503,6 +509,9 @@ function NavItem({
 
 function Sidebar({
   active,
+  epcsAccount,
+  onEpcsProfileSave,
+  onEpcsSynced,
   onNavigate,
   cartPage,
   onLogout,
@@ -516,6 +525,9 @@ function Sidebar({
   setPharmacyCatalog,
 }: {
   active: Page;
+  epcsAccount: EpcsAccount;
+  onEpcsProfileSave: (profile: EpcsProfile) => void;
+  onEpcsSynced: () => void;
   onNavigate: (p: Page) => void;
   cartPage: Page;
   onLogout: () => void;
@@ -623,7 +635,10 @@ function Sidebar({
         </div>
       )}
 
-      <SidebarSupportVersion onNavigate={onNavigate} />
+      <SidebarSupportVersion
+        onNavigate={onNavigate}
+        replacementNotice={<EpcsSyncNotice account={epcsAccount} onSave={onEpcsProfileSave} onSynced={onEpcsSynced} />}
+      />
       <div className="shrink-0 pb-3 pt-4">
         <UserChip onNavigate={onNavigate} onLogout={onLogout} />
       </div>
@@ -631,7 +646,7 @@ function Sidebar({
   );
 }
 
-function SidebarSupportVersion({ onNavigate }: { onNavigate: (p: Page) => void }) {
+function SidebarSupportVersion({ onNavigate, replacementNotice }: { onNavigate: (p: Page) => void; replacementNotice?: ReactNode }) {
   const paymentNoticeActive = () => Number(window.sessionStorage.getItem("clinic-card-notice-until") ?? 0) > Date.now();
   const accounts = [
     { name: "Zee Pharmacy", location: "Bronx, NY" },
@@ -725,7 +740,7 @@ function SidebarSupportVersion({ onNavigate }: { onNavigate: (p: Page) => void }
           </div>
         )}
       </div>
-      {clinicPaymentNoticeVisible && (
+      {replacementNotice ?? (clinicPaymentNoticeVisible && (
         <div className={`mt-2 rounded-[18px] border border-white/70 p-3 shadow-[0_10px_28px_rgba(38,54,45,0.08)] ${clinicPaymentUpdated ? "bg-[radial-gradient(circle_at_90%_0%,rgba(191,219,254,0.98),transparent_52%),linear-gradient(145deg,#eff6ff_0%,#dbeafe_100%)]" : "bg-[radial-gradient(circle_at_90%_0%,rgba(223,244,238,0.95),transparent_48%),linear-gradient(145deg,#fbfff3_0%,#f8f3e9_100%)]"}`}>
             <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.01em] text-[#171A18]">{clinicPaymentUpdated ? "Card updated" : "Update payment card"}</h3>
             <p className="mt-1.5 text-[11px] leading-[16px] text-[#737A75]">{clinicPaymentUpdated ? "Your new payment card is ready to use." : "Please review your saved card before placing your next order."}</p>
@@ -743,7 +758,7 @@ function SidebarSupportVersion({ onNavigate }: { onNavigate: (p: Page) => void }
               <ArrowUpRight size={13} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5" />
             </button>
           </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -1470,6 +1485,11 @@ type VialPalette = {
   foreground?: string;
 };
 
+type ProcessingDelay = {
+  additionalDays: number;
+  until?: string;
+};
+
 // Product definitions matching the Figma dashboard export exactly
 type CardDef = {
   id: number;
@@ -1488,7 +1508,7 @@ type CardDef = {
   heartVariant: "green" | "black" | "none";
   strength?: string;
   vialPalette?: VialPalette;
-  processingDelayByPharmacy?: Record<string, string>;
+  processingDelayByPharmacy?: Record<string, ProcessingDelay>;
 };
 
 function injectionArea(name: string) {
@@ -1560,7 +1580,7 @@ const INJECTION_CARDS: CardDef[] = INJECTION_PRODUCT_SEEDS.map((product, index) 
   vialPalette: injectionPalette(product.catalogNumber),
   // Example product-specific delay; other products keep their normal processing time.
   processingDelayByPharmacy: product.catalogNumber === 1
-    ? { "1st Choice Compounding Pharmacy": "7–8 days" }
+    ? { "1st Choice Compounding Pharmacy": { additionalDays: 4, until: "Sep 30" } }
     : undefined,
 }));
 
@@ -3127,26 +3147,30 @@ function ManualCapsulePreview({
   );
 }
 
-function ProcessingDelayNotice({ delay, compact = false, className = "" }: { delay: string; compact?: boolean; className?: string }) {
+function formatProcessingDays(minDays: number, maxDays: number) {
+  return minDays === maxDays ? `${minDays} ${minDays === 1 ? "day" : "days"}` : `${minDays}–${maxDays} days`;
+}
+
+function ProcessingDelayNotice({ delay, additionalDays, compact = false, className = "" }: { delay: string; additionalDays?: number; compact?: boolean; className?: string }) {
   if (compact) {
     return (
-      <span className={`block whitespace-nowrap text-[11px] leading-[17px] text-[#c05c0a] ${className}`}>
+      <span className={`block whitespace-nowrap text-[11px] leading-[17px] text-[#b91c1c] ${className}`}>
         <span className="font-medium">Delayed</span> · Est. ship in <span className="font-semibold tabular-nums">{delay}</span>
       </span>
     );
   }
 
   return (
-    <span className={`relative flex items-center rounded-[12px] border border-[#f1d894] bg-[#fffbea] px-2.5 py-2 ${className}`}>
-      <span className="flex min-w-0 items-center gap-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-[#eeba48] bg-[#fffdf4] p-0.5" aria-hidden="true">
-          <span className="flex size-full items-center justify-center rounded-[7px] border border-[#f2cc75] bg-[#ffe4a0] text-[#3d3015]">
-            <TriangleAlert size={17} strokeWidth={2} />
-          </span>
+    <span className={`flex items-center gap-2.5 rounded-[14px] bg-[#fff4f3] px-2.5 py-2 text-[#472d2b] ${className}`}>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-[#fffaf9] p-[3px]" aria-hidden="true">
+        <span className="flex size-full items-center justify-center rounded-[8px] bg-[#ffe2df]">
+          <TriangleAlert size={18} strokeWidth={1.8} fill="#aa3a34" className="[&>path:first-child]:stroke-none [&>path:not(:first-child)]:stroke-[#ffe2df]" />
         </span>
-        <span className="min-w-0">
-          <span className="block text-[11px] font-semibold leading-4 text-[#3e3520]">Processing delay</span>
-          <span className="block text-[10px] leading-[15px] text-[#786b4c]">Estimated time to ship</span>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-medium leading-4">{additionalDays != null ? `${additionalDays}-day processing delay` : "Processing delay"}</span>
+        <span className="mt-0.5 block text-[10px] leading-[15px] text-[#795b58]">
+          Total turnaround: <span className="font-semibold tabular-nums text-[#472d2b]">{delay}</span>
         </span>
       </span>
     </span>
@@ -3286,9 +3310,18 @@ function ProductDetailPage({
   const strengthPriceAdjustment = (Math.max(strengthOptions.indexOf(strength), 0) - Math.max(strengthOptions.indexOf(defaultStrength), 0)) * 5;
   const configurationPriceAdjustment = sizePriceAdjustment + strengthPriceAdjustment;
   const pharmacies = [
-    { name: is503B ? "1st Choice Compounding Pharmacy" : product.pharmacy, turnaround: "1–2 days", price: baseProductPrice },
-    { name: !is503B && product.pharmacy === "Rush Pharmacy FL" ? "Optimal Balance Pharmacy" : "Rush Pharmacy FL", turnaround: "1–2 days", price: baseProductPrice + 20 },
-  ].map(option => ({ ...option, processingDelay: product.processingDelayByPharmacy?.[option.name] }));
+    { name: is503B ? "1st Choice Compounding Pharmacy" : product.pharmacy, minProcessingDays: 1, maxProcessingDays: 2, price: baseProductPrice },
+    { name: !is503B && product.pharmacy === "Rush Pharmacy FL" ? "Optimal Balance Pharmacy" : "Rush Pharmacy FL", minProcessingDays: 1, maxProcessingDays: 2, price: baseProductPrice + 20 },
+  ].map(option => {
+    const processingDelay = product.processingDelayByPharmacy?.[option.name];
+    const additionalDays = processingDelay?.additionalDays ?? 0;
+    return {
+      ...option,
+      processingDelay,
+      turnaround: formatProcessingDays(option.minProcessingDays, option.maxProcessingDays),
+      totalTurnaround: formatProcessingDays(option.minProcessingDays + additionalDays, option.maxProcessingDays + additionalDays),
+    };
+  });
   const selectedPharmacy = pharmacies.find(option => option.name === pharmacy) ?? pharmacies[0];
   // Demo enrollment is specific to the pharmacy; replace with the doctor's account status.
   const enrolled503BPharmacies = completedEnrollments;
@@ -3594,10 +3627,10 @@ function ProductDetailPage({
                     </span>
                     <span className="text-right">
                       <span className={`block text-[12px] font-medium ${selected && productDetailVariant === 2 ? "text-white" : "text-[#111]"}`}>${Math.max(0, option.price + configurationPriceAdjustment).toFixed(2)}</span>
-                      <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${option.processingDelay ? (selected && productDetailVariant === 2 ? "text-[#ffc34d]" : "text-[#c05c0a]") : selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>{option.processingDelay ?? option.turnaround} processing</span>
+                      <span className={`mt-0.5 block whitespace-nowrap text-[10px] leading-tight ${selected && productDetailVariant === 2 ? "text-white/70" : "text-[#777]"}`}>{option.processingDelay ? "Usual turnaround: " : "Turnaround: "}{option.turnaround}</span>
                     </span>
                     {option.processingDelay && (
-                      <ProcessingDelayNotice delay={option.processingDelay} className="col-span-2 mt-2.5" />
+                      <ProcessingDelayNotice delay={option.totalTurnaround} additionalDays={option.processingDelay.additionalDays} className="col-span-2 mt-2" />
                     )}
                   </button>
                 );
@@ -3646,17 +3679,20 @@ function ProductDetailPage({
                   return (
                     <div key={id} className="bg-white px-3.5 py-3 transition-colors hover:bg-[#fcfdfc]">
                       <div className="grid grid-cols-[minmax(0,1fr)_120px] items-center gap-3">
-                        <button onClick={() => togglePatientDetails(id)} className="flex min-w-0 items-center gap-2 text-left" aria-expanded={isExpanded}>
-                          <span className="min-w-0">
-                            <span className="flex items-center gap-2">
-                              <span className="block truncate text-[11px] font-semibold text-[#171917]">{patient.firstName} {patient.lastName}</span>
-                              {alreadyInCart && <span className="shrink-0 rounded-full bg-[#dbe8ff] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#2563eb]">In cart</span>}
-                              {!alreadyInCart && <span className="shrink-0 rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#555]">Selected</span>}
+                        <div className="min-w-0">
+                          <button onClick={() => togglePatientDetails(id)} className="flex w-full min-w-0 items-center gap-2 text-left" aria-expanded={isExpanded}>
+                            <span className="min-w-0">
+                              <span className="flex items-center gap-2">
+                                <span className="block truncate text-[11px] font-semibold text-[#171917]">{patient.firstName} {patient.lastName}</span>
+                                {alreadyInCart && <span className="shrink-0 rounded-full bg-[#dbe8ff] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#2563eb]">In cart</span>}
+                                {!alreadyInCart && <span className="shrink-0 rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#555]">Selected</span>}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[9px] text-[#7a837f]">DOB {patient.birthDate}</span>
                             </span>
-                            <span className="mt-0.5 block truncate text-[9px] text-[#7a837f]">DOB {patient.birthDate}</span>
-                          </span>
-                          <ChevronDown size={13} className={`shrink-0 text-[#777] transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                        </button>
+                            <ChevronDown size={13} className={`shrink-0 text-[#777] transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          </button>
+                          <PatientEpcsStatus data={patient} href={`#/patients/${id}`} className="mt-1.5" />
+                        </div>
                         <div className="inline-flex h-10 w-fit items-center overflow-hidden rounded-full border border-[#e2e2e2] bg-white">
                           {patientQty === 1 ? (
                             <button onClick={() => alreadyInCart ? updateAddedPatientQuantity(id, -1) : togglePatient(id)} className="flex h-10 w-10 items-center justify-center text-[#202020] transition-colors hover:bg-[#f7f7f7]" aria-label={`Remove ${patient.firstName} ${patient.lastName}`}><Trash2 size={15} /></button>
@@ -3679,6 +3715,8 @@ function ProductDetailPage({
               </div>
             </div>
           )}
+
+          {!is503B && <PatientEpcsNotice patients={visiblePatientIds.map(id => PATIENTS[id])} className="mt-3" />}
 
           {is503B ? (
             <div className="mt-6">
@@ -3716,14 +3754,17 @@ function ProductDetailPage({
                     const selected = selectedPatientIds.has(id);
                     const alreadyInCart = addedPatientQuantities[id] !== undefined;
                     return (
-                      <button key={id} disabled={alreadyInCart} onClick={() => { togglePatient(id); setPatientPickerOpen(false); }} className={`w-full rounded-[7px] px-3 py-2.5 text-left transition-colors ${alreadyInCart ? "cursor-default bg-[#f3f7ff]" : selected ? "bg-[#f3f5f4]" : "hover:bg-[#f8f7f5]"}`}>
-                        <span className="flex items-center gap-2">
-                          <span className={`block text-[12px] font-semibold ${alreadyInCart || selected ? "text-[#667085]" : "text-[#1a1a1a]"}`}>{patient.firstName} {patient.lastName}</span>
-                          {alreadyInCart && <span className="rounded-full bg-[#dbe8ff] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#2563eb]">In cart</span>}
-                          {selected && !alreadyInCart && <span className="rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#555]">Selected</span>}
-                        </span>
-                        <span className={`mt-0.5 block text-[10px] ${alreadyInCart || selected ? "text-[#98a2b3]" : "text-[#777]"}`}>{patient.birthDate} · {patient.gender}</span>
-                      </button>
+                      <div key={id} className={`relative w-full rounded-[7px] px-3 py-2.5 text-left transition-colors ${alreadyInCart ? "bg-[#f3f7ff]" : selected ? "bg-[#f3f5f4]" : "hover:bg-[#f8f7f5]"}`}>
+                        <button type="button" disabled={alreadyInCart} onClick={() => { togglePatient(id); setPatientPickerOpen(false); }} className="block w-full text-left after:absolute after:inset-0 after:rounded-[7px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] disabled:cursor-default">
+                          <span className="flex items-center gap-2">
+                            <span className={`block text-[12px] font-semibold ${alreadyInCart || selected ? "text-[#667085]" : "text-[#1a1a1a]"}`}>{patient.firstName} {patient.lastName}</span>
+                            {alreadyInCart && <span className="rounded-full bg-[#dbe8ff] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#2563eb]">In cart</span>}
+                            {selected && !alreadyInCart && <span className="rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-[#555]">Selected</span>}
+                          </span>
+                          <span className={`mt-0.5 block text-[10px] ${alreadyInCart || selected ? "text-[#98a2b3]" : "text-[#777]"}`}>{patient.birthDate} · {patient.gender}</span>
+                        </button>
+                        <PatientEpcsStatus data={patient} href={`#/patients/${id}`} className="mt-1.5" />
+                      </div>
                     );
                   })}
                 </div>
@@ -3853,7 +3894,7 @@ function ProductDetailPage({
           <h2 className="text-[20px] font-medium tracking-[-0.02em] text-[#171717]">Product Supply</h2>
           <div className="mt-5 flex h-[393px] w-[268px] max-w-full flex-col overflow-hidden rounded-[14px] border border-[#e4e4e4] bg-white">
             <div className="flex h-[190px] shrink-0 items-center justify-center overflow-hidden bg-[#fafafa] p-5">
-              <img src={productSupplyNeedle} alt="Packaged subcutaneous needle" className="h-full w-full object-contain mix-blend-multiply" />
+              <img src={productSupplyPack} alt="Subcutaneous supplies kit with a syringe, packaged needle, and alcohol prep pads" className="h-full w-full object-contain mix-blend-multiply" />
             </div>
             <div className="flex min-h-0 flex-1 flex-col p-4">
               <h3 className="text-[15px] font-medium leading-5 text-[#1d1d1d]">SQ Supplies Pack</h3>
@@ -7192,29 +7233,45 @@ function SupportPage({ onNavigate: _onNavigate }: { onNavigate: (p: Page) => voi
 
 // ─── Users/Patients ───────────────────────────────────────────────────────────
 
-const PATIENTS = [
-  { firstName: "Dan", lastName: "Rahming", birthDate: "04/14/1991", gender: "M", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705" },
-  { firstName: "Chad", lastName: "Rahming", birthDate: "04/14/1991", gender: "M", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705" },
-  { firstName: "Alex", lastName: "Rahming", birthDate: "08/14/1991", gender: "F", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Tuckahoe", state: "NY", zip: "10707" },
-  { firstName: "Sam", lastName: "B.", birthDate: "05/31/1995", gender: "F", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705" },
-  { firstName: "Eve", lastName: "K.", birthDate: "02/14/1991", gender: "F", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705" },
-  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "395 Oak St", address2: "Suite 500", city: "Los Angeles", state: "CA", zip: "90001" },
-  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k" },
-  { firstName: "Taylor", lastName: "Mitchell", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "965 Dan St", address2: "Apr NJ", city: "New York", state: "NY", zip: "50001" },
-  { firstName: "Mark", lastName: "Wood", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "965 Dan St", address2: "Floor A", city: "New York", state: "NY", zip: "50001" },
-  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k" },
-  { firstName: "John", lastName: "Smith", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646)617-1880", address1: "965 Dan St", address2: "Apr NJ", city: "New York", state: "NY", zip: "50001" },
-  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k" },
-  { firstName: "Robert", lastName: "Wilson", birthDate: "08/03/1975", gender: "M", primaryPhone: "(646) 617-1880", address1: "395 Oak St", address2: "Suite 500", city: "Los Angeles", state: "CA", zip: "90001" },
-  { firstName: "Jane", lastName: "Doe", birthDate: "03/22/1988", gender: "F", primaryPhone: "(646) 617-1880", address1: "88 Elm Ave", address2: "", city: "English", state: "WA", zip: "98001" },
-  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k" },
-  { firstName: "Allison", lastName: "Johnson", birthDate: "11/25/1985", gender: "F", primaryPhone: "(646) 617-1880", address1: "902 Cedar Ln", address2: "", city: "English", state: "WA", zip: "98003" },
-  { firstName: "Emily", lastName: "Davis", birthDate: "07/19/1990", gender: "F", primaryPhone: "(646) 617-1880", address1: "902 Cedar Ln", address2: "", city: "English", state: "WA", zip: "98003" },
-  { firstName: "Tom", lastName: "Taylor", birthDate: "09/05/1982", gender: "M", primaryPhone: "(646) 617-1880", address1: "902 Cedar Ln", address2: "", city: "Houston", state: "TX", zip: "77001" },
-  { firstName: "Sara", lastName: "Brown", birthDate: "04/11/1994", gender: "F", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Apr NJ", city: "Atlanta", state: "GA", zip: "30301" },
-  { firstName: "Tom", lastName: "Taylor", birthDate: "09/05/1982", gender: "M", primaryPhone: "(646) 617-1880", address1: "902 Canal Dr", address2: "", city: "Houston", state: "TX", zip: "77001" },
-  { firstName: "Jane", lastName: "Doe", birthDate: "03/22/1988", gender: "F", primaryPhone: "(646) 617-1880", address1: "88 Elm Ave", address2: "Suite 2001", city: "Los Angeles", state: "CA", zip: "90003" },
-  { firstName: "Michael", lastName: "Chu", birthDate: "06/30/1979", gender: "M", primaryPhone: "(646) 617-1880", address1: "396 May Dr", address2: "", city: "New York", state: "NY", zip: "10001" },
+type Patient = DoseSpotSyncData & {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  gender: string;
+  primaryPhone: string;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: string;
+  epcsStatus: EpcsStatus;
+  bmi?: number | null;
+};
+
+// Demo EPCS states; the patient API should supply epcsStatus when connected.
+const PATIENTS: Patient[] = [
+  { firstName: "Dan", lastName: "Rahming", birthDate: "04/14/1991", gender: "M", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705", epcsStatus: "synced" },
+  { firstName: "Chad", lastName: "Rahming", birthDate: "04/14/1991", gender: "M", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705", bmi: null, epcsStatus: "not_registered", epcsEligible: false, epcsMissingFields: ["BMI"] },
+  { firstName: "Alex", lastName: "Rahming", birthDate: "08/14/1991", gender: "F", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Tuckahoe", state: "NY", zip: "10707", epcsStatus: "needs_sync" },
+  { firstName: "Sam", lastName: "B.", birthDate: "05/31/1995", gender: "F", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705", epcsStatus: "not_registered", epcsEligible: true },
+  { firstName: "Eve", lastName: "K.", birthDate: "02/14/1991", gender: "F", primaryPhone: "(646) 617-1880", address1: "95 Meadowbrook Drive", address2: "", city: "Westchester County", state: "NY", zip: "10705", epcsStatus: "synced" },
+  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "395 Oak St", address2: "Suite 500", city: "Los Angeles", state: "CA", zip: "90001", epcsStatus: "synced" },
+  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k", epcsStatus: "synced" },
+  { firstName: "Taylor", lastName: "Mitchell", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "965 Dan St", address2: "Apr NJ", city: "New York", state: "NY", zip: "50001", epcsStatus: "synced" },
+  { firstName: "Mark", lastName: "Wood", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "965 Dan St", address2: "Floor A", city: "New York", state: "NY", zip: "50001", epcsStatus: "synced" },
+  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k", epcsStatus: "synced" },
+  { firstName: "John", lastName: "Smith", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646)617-1880", address1: "965 Dan St", address2: "Apr NJ", city: "New York", state: "NY", zip: "50001", epcsStatus: "synced" },
+  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k", epcsStatus: "synced" },
+  { firstName: "Robert", lastName: "Wilson", birthDate: "08/03/1975", gender: "M", primaryPhone: "(646) 617-1880", address1: "395 Oak St", address2: "Suite 500", city: "Los Angeles", state: "CA", zip: "90001", epcsStatus: "synced" },
+  { firstName: "Jane", lastName: "Doe", birthDate: "03/22/1988", gender: "F", primaryPhone: "(646) 617-1880", address1: "88 Elm Ave", address2: "", city: "English", state: "WA", zip: "98001", epcsStatus: "synced" },
+  { firstName: "John", lastName: "Scott", birthDate: "01/17/1993", gender: "M", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Floor 5", city: "Denver", state: "CO", zip: "k", epcsStatus: "synced" },
+  { firstName: "Allison", lastName: "Johnson", birthDate: "11/25/1985", gender: "F", primaryPhone: "(646) 617-1880", address1: "902 Cedar Ln", address2: "", city: "English", state: "WA", zip: "98003", epcsStatus: "synced" },
+  { firstName: "Emily", lastName: "Davis", birthDate: "07/19/1990", gender: "F", primaryPhone: "(646) 617-1880", address1: "902 Cedar Ln", address2: "", city: "English", state: "WA", zip: "98003", epcsStatus: "synced" },
+  { firstName: "Tom", lastName: "Taylor", birthDate: "09/05/1982", gender: "M", primaryPhone: "(646) 617-1880", address1: "902 Cedar Ln", address2: "", city: "Houston", state: "TX", zip: "77001", epcsStatus: "synced" },
+  { firstName: "Sara", lastName: "Brown", birthDate: "04/11/1994", gender: "F", primaryPhone: "(646) 617-1880", address1: "962 NEC Blvd", address2: "Apr NJ", city: "Atlanta", state: "GA", zip: "30301", epcsStatus: "synced" },
+  { firstName: "Tom", lastName: "Taylor", birthDate: "09/05/1982", gender: "M", primaryPhone: "(646) 617-1880", address1: "902 Canal Dr", address2: "", city: "Houston", state: "TX", zip: "77001", epcsStatus: "synced" },
+  { firstName: "Jane", lastName: "Doe", birthDate: "03/22/1988", gender: "F", primaryPhone: "(646) 617-1880", address1: "88 Elm Ave", address2: "Suite 2001", city: "Los Angeles", state: "CA", zip: "90003", epcsStatus: "synced" },
+  { firstName: "Michael", lastName: "Chu", birthDate: "06/30/1979", gender: "M", primaryPhone: "(646) 617-1880", address1: "396 May Dr", address2: "", city: "New York", state: "NY", zip: "10001", epcsStatus: "synced" },
 ];
 
 function PatientCreateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -7323,7 +7380,16 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const [createPatientOpen, setCreatePatientOpen] = useState(false);
   const [patients, setPatients] = useState(PATIENTS);
   const [openPatientMenu, setOpenPatientMenu] = useState<number | null>(null);
-  const [selectedPatientIndex, setSelectedPatientIndex] = useState<number | null>(null);
+  const patientIndexFromLink = () => {
+    const match = window.location.hash.match(/^#\/patients\/(\d+)$/);
+    return match && patients[Number(match[1])] ? Number(match[1]) : null;
+  };
+  const [selectedPatientIndex, setSelectedPatientIndex] = useState<number | null>(patientIndexFromLink);
+  useEffect(() => {
+    const openLinkedPatient = () => setSelectedPatientIndex(patientIndexFromLink());
+    window.addEventListener("hashchange", openLinkedPatient);
+    return () => window.removeEventListener("hashchange", openLinkedPatient);
+  }, [patients]);
   const filtered = patients.filter(
     (p) =>
       `${p.firstName} ${p.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -7339,17 +7405,18 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
     }).length;
   }
 
-  function patientBmi(index: number) {
+  function patientBmi(patient: Patient, index: number) {
+    if (patient.bmi === null) return null;
     const values = [23.4, 24.8, 27.1, 22.6, 25.3, 29.2, 24.1, 26.7, 21.9, 30.4, 23.8, 28.1];
-    const value = values[index % values.length];
+    const value = patient.bmi ?? values[index % values.length];
     const classification = value < 18.5 ? "Underweight" : value < 25 ? "Normal" : value < 30 ? "Overweight" : "Obesity";
     return { value, classification };
   }
 
-  const COLS = ["Patient", "Phone", "Address", "BMI", "Orders", ""];
+  const COLS = ["Patient", "Phone", "Address", "BMI", "DoseSpot / EPCS", "Orders", ""];
 
   if (selectedPatientIndex !== null && patients[selectedPatientIndex]) {
-    return <><PatientDetailsView patient={patients[selectedPatientIndex]} onBack={() => setSelectedPatientIndex(null)} onEdit={() => setCreatePatientOpen(true)} /><PatientCreateModal open={createPatientOpen} onClose={() => setCreatePatientOpen(false)} /></>;
+    return <><PatientDetailsView patient={patients[selectedPatientIndex]} onBack={() => { setSelectedPatientIndex(null); window.location.hash = "/patients"; }} onEdit={() => setCreatePatientOpen(true)} /><PatientCreateModal open={createPatientOpen} onClose={() => setCreatePatientOpen(false)} /></>;
   }
 
   return (
@@ -7400,6 +7467,7 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             <tbody>
               {filtered.map((p, i) => {
                 const patientIndex = patients.indexOf(p);
+                const bmi = patientBmi(p, patientIndex);
                 return (
                 <tr
                   key={i}
@@ -7420,9 +7488,9 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-5 py-3.5">
-                    <span className="block text-[12px] font-medium text-[#333]">{patientBmi(patientIndex).value.toFixed(1)}</span>
-                    <span className="mt-0.5 block text-[10px] font-normal text-[#858b88]">{patientBmi(patientIndex).classification}</span>
+                    {bmi ? <><span className="block text-[12px] font-medium text-[#333]">{bmi.value.toFixed(1)}</span><span className="mt-0.5 block text-[10px] font-normal text-[#858b88]">{bmi.classification}</span></> : <span className="text-[11px] text-[#858b88]">Not provided</span>}
                   </td>
+                  <td className="px-5 py-3.5"><DoseSpotStatusIndicator data={p} name={`${p.firstName} ${p.lastName}`} kind="patient" href={`#/patients/${patientIndex}`} /></td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-[12px] font-normal text-[#4b4b4b]">{patientOrderCount(p)}</td>
                   <td onClick={event => event.stopPropagation()} className="relative px-4 py-3.5 text-right">
                     <button onClick={() => setOpenPatientMenu(current => current === patientIndex ? null : patientIndex)} className={`flex size-7 items-center justify-center rounded-[7px] text-[#777] transition-all hover:bg-[#eceae7] hover:text-[#111] ${openPatientMenu === patientIndex ? "bg-[#eceae7] opacity-100" : "opacity-0 group-hover:opacity-100"}`} aria-label={`Actions for ${p.firstName} ${p.lastName}`}>
@@ -7594,7 +7662,14 @@ function SettingsChangePasswordModal({ isOpen, onClose, onSave, isSubmitting }: 
 function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const shouldOpenPaymentSetup = () => window.sessionStorage.getItem("open-payment-setup") === "true";
   const shouldOpenPaymentOverview = () => window.sessionStorage.getItem("open-payment-overview") === "true";
-  const [activeTab, setActiveTab] = useState(() => shouldOpenPaymentSetup() || shouldOpenPaymentOverview() ? "Pay by Clinic" : "Business Account");
+  const [activeTab, setActiveTab] = useState(() => window.location.hash === "#/settings/prescribers" ? "Prescribers" : shouldOpenPaymentSetup() || shouldOpenPaymentOverview() ? "Pay by Clinic" : "Business Account");
+  useEffect(() => {
+    const openLinkedTab = () => {
+      if (window.location.hash === "#/settings/prescribers") setActiveTab("Prescribers");
+    };
+    window.addEventListener("hashchange", openLinkedTab);
+    return () => window.removeEventListener("hashchange", openLinkedTab);
+  }, []);
   const [paymentTab, setPaymentTab] = useState<"Credit Card" | "Bank Account (ACH)">("Credit Card");
   const [primaryClinicPayment, setPrimaryClinicPayment] = useState<"credit" | "ach">("credit");
   const [creditCardOpen, setCreditCardOpen] = useState(() => shouldOpenPaymentSetup());
@@ -7767,13 +7842,14 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
     ["8", "shpend support", "(646)-617-9881", "shpend-support@gmail.com", "Manager"],
     ["9", "Shpend Beqiraj", "(646)-617-9881", "shpend@scriptlinkrx.com", "Prescriber"],
   ];
-  const prescribers = [
-    ["1", "Chirag Support", "(646)-617-9881", "chirag_support@scriptlinkrx.com", "1234566982"],
-    ["2", "Altin Selimi", "(646)-617-9881", "altin@batchrx.com", "1804612084"],
-    ["3", "Altin Selimi", "(646)-617-9881", "altiin-a@scriptlinkrx.com", "-"],
-    ["4", "Alex Revira", "(100)-147-1633", "alex@scriptlinkrx.com", "1121311614"],
-    ["5", "Eric Garcia", "(646)-389-9683", "eric@scriptlinkrx.com", "1234232323"],
-    ["6", "Zee Rabushaj", "(646)-617-9881", "demo2@scriptlinkrx.com", "1234523452"],
+  // Demo backend responses; account activity and DoseSpot status are independent.
+  const prescribers: { cells: string[]; doseSpot: DoseSpotSyncData }[] = [
+    { cells: ["1", "Chirag Support", "(646)-617-9881", "chirag_support@scriptlinkrx.com", "1234566982"], doseSpot: { epcsStatus: "synced", epcsEligible: true } },
+    { cells: ["2", "Altin Selimi", "(646)-617-9881", "altin@batchrx.com", "1804612084"], doseSpot: { epcsStatus: "needs_sync", epcsEligible: true } },
+    { cells: ["3", "Altin Selimi", "(646)-617-9881", "altiin-a@scriptlinkrx.com", "-"], doseSpot: { epcsStatus: "not_registered", epcsEligible: false, epcsMissingFields: ["NPI number"] } },
+    { cells: ["4", "Alex Revira", "(100)-147-1633", "alex@scriptlinkrx.com", "1121311614"], doseSpot: { epcsStatus: "not_registered", epcsEligible: true } },
+    { cells: ["5", "Eric Garcia", "(646)-389-9683", "eric@scriptlinkrx.com", "1234232323"], doseSpot: { epcsStatus: "synced", epcsEligible: true } },
+    { cells: ["6", "Zee Rabushaj", "(646)-617-9881", "demo2@scriptlinkrx.com", "1234523452"], doseSpot: { epcsStatus: "needs_sync", epcsEligible: false, epcsMissingFields: ["Date of birth", "DEA number", "State license number", "Mobile number"] } },
   ];
 
   function SettingsField({ label, value, required, wide }: { label: string; value: string; required?: boolean; wide?: boolean }) {
@@ -7792,20 +7868,22 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   }
 
   function DataTable({ type }: { type: "users" | "prescribers" }) {
-    const rows = type === "users" ? users : prescribers;
+    const rows = type === "users" ? users.map(cells => ({ cells, doseSpot: undefined })) : prescribers;
     const headers = type === "users"
       ? ["#", "Full Name", "User Phone", "User Email", "User Title", "Status", ""]
-      : ["#", "Full Name", "Prescriber Phone", "Prescriber Email", "NPI Number", "Status", ""];
+      : ["#", "Full Name", "Prescriber Phone", "Prescriber Email", "NPI Number", "DoseSpot / EPCS", "Status", ""];
+    const columns = type === "users" ? "grid-cols-[40px_1.25fr_1fr_1.55fr_1fr_92px_38px]" : "grid-cols-[32px_minmax(140px,1.25fr)_1fr_1.55fr_1fr_132px_80px_38px]";
     return (
       <div className="rounded-[12px] bg-[#FBFBFB] p-2">
-        <div className="grid grid-cols-[40px_1.25fr_1fr_1.55fr_1fr_92px_38px] rounded-t-[9px] bg-[#FBFBFB] px-4 py-3">
+        <div className={`grid ${columns} rounded-t-[9px] bg-[#FBFBFB] px-4 py-3`}>
           {headers.map(h => (
             <span key={h} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c8c]">{h}</span>
           ))}
         </div>
-        {rows.map(row => (
-          <div key={`${type}-${row[0]}`} className="relative grid grid-cols-[40px_1.25fr_1fr_1.55fr_1fr_92px_38px] items-center bg-white px-4 py-3.5 text-[12px] text-[#1a1a1a] transition-colors hover:bg-[var(--app-soft-hover)]">
+        {rows.map(({ cells: row, doseSpot }) => (
+          <div key={`${type}-${row[0]}`} className={`relative grid ${columns} items-center bg-white px-4 py-3.5 text-[12px] text-[#1a1a1a] transition-colors hover:bg-[var(--app-soft-hover)]`}>
             {row.map((cell, index) => index === 1 ? <span key={cell} className="min-w-0 truncate font-semibold">{cell}</span> : <span key={`${index}-${cell}`} className={`min-w-0 truncate ${index === 0 ? "text-[#999]" : ""}`}>{cell}</span>)}
+            {doseSpot && <div><DoseSpotStatusIndicator data={doseSpot} name={row[1]} kind="prescriber" /></div>}
             <span className="inline-flex w-fit rounded-full bg-[#ecf8ef] px-3 py-1.5 text-[10px] font-semibold text-[#31583F]">Active</span>
             <div className="relative">
               <button data-menu-trigger onClick={() => type === "users" ? setOpenUserMenu(current => current === row[0] ? null : row[0]) : setOpenPrescriberMenu(current => current === row[0] ? null : row[0])} className={`flex size-7 items-center justify-center rounded-[7px] transition-colors ${(type === "users" ? openUserMenu === row[0] : openPrescriberMenu === row[0]) ? "bg-[#f2f7f4] text-[#183229]" : "text-[#8c95a1] hover:bg-[#f2f7f4] hover:text-[#183229]"}`} aria-label={`Actions for ${row[1]}`} aria-expanded={type === "users" ? openUserMenu === row[0] : openPrescriberMenu === row[0]}>
@@ -8423,9 +8501,9 @@ function SinglePatientCartPage({
   setCartMode: (mode: CartMode) => void;
 }) {
   const initialPatients = [
-    { id: "zeee", name: "Zeee Rabushaj", dob: "06/14/2007", gender: "M", phone: "(646)-389-7766", address: "95 Windermere Drive, Westchester County, NY 10710" },
-    { id: "altin", name: "Altin Selimi", dob: "11/12/1994", gender: "M", phone: "(646)-617-9881", address: "95 Windermere Drive, Yonkers, NY 10710" },
-    { id: "jane", name: "Jane Doe", dob: "03/22/1990", gender: "F", phone: "5552345678", address: "456 Oak Ave, Los Angeles CA 90001" },
+    { id: "zeee", name: "Zeee Rabushaj", dob: "06/14/2007", gender: "M", phone: "(646)-389-7766", address: "95 Windermere Drive, Westchester County, NY 10710", epcsStatus: "synced" as EpcsStatus },
+    { id: "altin", name: "Altin Selimi", dob: "11/12/1994", gender: "M", phone: "(646)-617-9881", address: "95 Windermere Drive, Yonkers, NY 10710", epcsStatus: "not_registered" as EpcsStatus },
+    { id: "jane", name: "Jane Doe", dob: "03/22/1990", gender: "F", phone: "5552345678", address: "456 Oak Ave, Los Angeles CA 90001", epcsStatus: "needs_sync" as EpcsStatus },
   ];
   const [patients, setPatients] = useState(initialPatients);
   const [patientByPharmacy, setPatientByPharmacy] = useState<Record<string, string>>({});
@@ -8464,7 +8542,11 @@ function SinglePatientCartPage({
   const patientForPharmacy = (pharmacyName: string) =>
     patients.find(patient => patient.id === patientByPharmacy[pharmacyName]) ?? null;
   const activePatient = activePharmacy ? patientForPharmacy(activePharmacy) : null;
-  const assignedPharmacyCount = pharmacyGroups.filter(pharmacy => patientForPharmacy(pharmacy.name)).length;
+  const assignedPatients = pharmacyGroups.flatMap(pharmacy => {
+    const patient = patientForPharmacy(pharmacy.name);
+    return patient ? [patient] : [];
+  });
+  const assignedPharmacyCount = assignedPatients.length;
   const allPharmaciesAssigned = pharmacyGroups.length > 0 && assignedPharmacyCount === pharmacyGroups.length;
   const prescriptionsComplete = prescriptionItems.every(item => {
     const details = prescriptionDetails[item.id];
@@ -8504,6 +8586,7 @@ function SinglePatientCartPage({
       gender: String(form.get("gender") ?? ""),
       phone,
       address,
+      epcsStatus: "not_registered" as EpcsStatus,
     };
     setPatients(current => [...current, patient]);
     if (activePharmacy) {
@@ -8587,6 +8670,7 @@ function SinglePatientCartPage({
                           </div>
                           <button onClick={() => { setActivePharmacy(pharmacy.name); setShowPatientPicker(true); }} className="text-[10px] font-semibold text-[#183229] hover:underline">Change</button>
                         </div>
+                        <PatientEpcsStatus data={cardPatient} className="mb-2" />
                         <div className="rounded-[8px] border border-[#eee8e3] bg-[var(--app-soft-hover)] px-3 py-2.5 text-[11px] font-medium leading-relaxed text-[#6f7782]">
                           <div className="flex items-center gap-1.5"><Phone size={12} strokeWidth={1.8} className="shrink-0 text-[#183229]" /><span>{cardPatient.phone}</span></div>
                           <div className="mt-1 flex items-start gap-1.5"><MapPin size={12} strokeWidth={1.8} className="mt-0.5 shrink-0 text-[#183229]" /><span>{cardPatient.address}</span></div>
@@ -8719,27 +8803,30 @@ function SinglePatientCartPage({
               {pharmacyGroups.map(pharmacy => {
                 const patient = patientForPharmacy(pharmacy.name);
                 return (
-                  <button
+                  <div
                     key={pharmacy.name}
-                    onClick={() => { setActivePharmacy(pharmacy.name); setShowPatientPicker(true); }}
-                    className={`w-full rounded-[9px] border px-3 py-2.5 text-left transition-colors ${patient ? "border-[#eee8e3] bg-[var(--app-soft-hover)]" : "border-dashed border-[#aebbb5] bg-[#f8faf9]"}`}
+                    className={`relative w-full rounded-[9px] border px-3 py-2.5 text-left transition-colors ${patient ? "border-[#eee8e3] bg-[var(--app-soft-hover)]" : "border-dashed border-[#aebbb5] bg-[#f8faf9]"}`}
                   >
-                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[#667085]">{pharmacy.name}</p>
-                    {patient ? (
-                      <>
-                        <p className="mt-1 text-[12px] font-semibold text-[#1a1a1a]">{patient.name} ({patient.gender})</p>
-                        <p className="mt-0.5 text-[11px] text-[#6f7782]">{patient.phone}</p>
-                      </>
-                    ) : (
-                      <span className="mt-2 inline-flex h-7 w-fit items-center gap-1.5 rounded-full border border-dashed border-[#cfd8d3] bg-white px-2.5 text-[11px] font-bold text-[#334155]">
-                        <User size={12} strokeWidth={1.8} className="text-[#52645c]" />
-                        Choose patient
-                      </span>
-                    )}
-                  </button>
+                    <button type="button" onClick={() => { setActivePharmacy(pharmacy.name); setShowPatientPicker(true); }} className="block w-full text-left after:absolute after:inset-0 after:rounded-[9px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]">
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[#667085]">{pharmacy.name}</p>
+                      {patient ? (
+                        <>
+                          <p className="mt-1 text-[12px] font-semibold text-[#1a1a1a]">{patient.name} ({patient.gender})</p>
+                          <p className="mt-0.5 text-[11px] text-[#6f7782]">{patient.phone}</p>
+                        </>
+                      ) : (
+                        <span className="mt-2 inline-flex h-7 w-fit items-center gap-1.5 rounded-full border border-dashed border-[#cfd8d3] bg-white px-2.5 text-[11px] font-bold text-[#334155]">
+                          <User size={12} strokeWidth={1.8} className="text-[#52645c]" />
+                          Choose patient
+                        </span>
+                      )}
+                    </button>
+                    {patient && <PatientEpcsStatus data={patient} className="mt-1.5" />}
+                  </div>
                 );
               })}
             </div>
+            <PatientEpcsNotice patients={assignedPatients} />
             <div className="border-t border-[#eee8e3] pt-4">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#667085]">Items</p>
               <div className="flex flex-col gap-3">
@@ -9056,24 +9143,30 @@ function SinglePatientCartPage({
                   {visiblePatients.map(patient => {
                     const isSelected = activePatient?.id === patient.id;
                     return (
-                      <button
+                      <div
                         key={patient.id}
-                        onClick={() => {
-                          if (activePharmacy) {
-                            setPatientByPharmacy(current => ({ ...current, [activePharmacy]: patient.id }));
-                          }
-                          setShowPatientPicker(false);
-                          setPatientSearch("");
-                          setActivePharmacy(null);
-                        }}
-                        className={`flex w-full items-center justify-between gap-4 rounded-[8px] border px-3 py-3 text-left transition-colors ${isSelected ? "border-[#183229] bg-[#f2f7f4]" : "border-[#e8e3df] hover:border-[#183229]/35"}`}
+                        className={`relative w-full rounded-[8px] border px-3 py-3 text-left transition-colors ${isSelected ? "border-[#183229] bg-[#f2f7f4]" : "border-[#e8e3df] hover:border-[#183229]/35"}`}
                       >
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-semibold text-[#1a1a1a]">{patient.name} ({patient.gender})</p>
-                          <p className="mt-1 text-[11px] text-[#6f7782]">{patient.phone} · {patient.address}</p>
-                        </div>
-                        {isSelected && <CheckCircle2 size={15} className="shrink-0 text-[#183229]" />}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (activePharmacy) {
+                              setPatientByPharmacy(current => ({ ...current, [activePharmacy]: patient.id }));
+                            }
+                            setShowPatientPicker(false);
+                            setPatientSearch("");
+                            setActivePharmacy(null);
+                          }}
+                          className="flex w-full items-center justify-between gap-4 text-left after:absolute after:inset-0 after:rounded-[8px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold text-[#1a1a1a]">{patient.name} ({patient.gender})</p>
+                            <p className="mt-1 text-[11px] text-[#6f7782]">{patient.phone} · {patient.address}</p>
+                          </div>
+                          {isSelected && <CheckCircle2 size={15} className="shrink-0 text-[#183229]" />}
+                        </button>
+                        <PatientEpcsStatus data={patient} className="mt-1.5" />
+                      </div>
                     );
                   })}
                   {visiblePatients.length === 0 && <p className="py-8 text-center text-[12px] text-[#6f7782]">No patients found.</p>}
@@ -12395,6 +12488,7 @@ function PageContentSkeleton({ page }: { page: Page }) {
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [epcsAccount, setEpcsAccount] = useState<EpcsAccount>(DEMO_EPCS_ACCOUNT);
   const [authView, setAuthView] = useState<"landing" | "login" | "business-select" | "organization" | "register" | "single-sign-on" | "request-demo" | "contact">("landing");
   const [appTheme, setAppTheme] = useState<AppTheme>(() => {
     const savedTheme = window.localStorage.getItem("scriptlinkrx-theme");
@@ -12886,6 +12980,9 @@ export default function App() {
             {/* Sidebar Navigation */}
             <Sidebar
               active={page === "not-found" || page === "something-went-wrong" ? "order-history" : page}
+              epcsAccount={epcsAccount}
+              onEpcsProfileSave={profile => setEpcsAccount(current => ({ ...current, profile, doseSpotSyncRequired: true }))}
+              onEpcsSynced={() => setEpcsAccount(current => ({ ...current, doseSpotSyncRequired: false }))}
               onNavigate={setPage}
               cartPage={cartPage}
               onLogout={() => {
