@@ -7,6 +7,7 @@ import { DoseSpotStatusIndicator } from "./DoseSpotStatusIndicator";
 import { type DoseSpotSyncData } from "./dosespot-status";
 import { getPatientVoucherSummaries, getVoucherDiscount, patientVoucherKey } from "./cart-vouchers";
 import { ErrorPage, type ErrorPageKind } from "./ErrorPage";
+import { SalesCatalogAccessPage } from "./SalesCatalogAccessPage";
 import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
 import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType, type CartConflict } from "./cart-rules";
 import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
@@ -142,6 +143,7 @@ type Page =
   | "orders"
   | "order-detail"
   | "order-history"
+  | "sales-catalog"
   | ErrorPageKind
   | "pending-approvals"
   | "support"
@@ -165,6 +167,7 @@ function pageFromLink(hash: string): Page | null {
     case "#/404": return "not-found";
     case "#/something-went-wrong": return "something-went-wrong";
     case "#/order-history": return "order-history";
+    case "#/sales-catalog": return "sales-catalog";
     default: return null;
   }
 }
@@ -5019,6 +5022,7 @@ interface OrderHistoryEntry {
   net_paid: number;
   payment_timestamp: string | null;
   errorPage?: ErrorPageKind;
+  previewPage?: "sales-catalog";
 }
 
 const orderHistoryDaysAgo = (days: number, hour = 10, minute = 24) => {
@@ -5032,7 +5036,7 @@ const ORDER_HISTORY_ENTRIES: OrderHistoryEntry[] = [
   { order_id: "8f2c91d34a6e47b1905cfd12e8a3f82c9a3f82c1", created_at: orderHistoryDaysAgo(0, 9, 14), patient_name: "Sarah Mitchell", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "pending_payment", payment_method: "patient", is_paid: false, is_cancelled: false, total_price: 215.98, refunded_amount: 0, net_paid: 0, payment_timestamp: null, errorPage: "not-found" },
   { order_id: "1d84f7a2c95b40e3871a6f0d24b7c1e94d67b2e0", created_at: orderHistoryDaysAgo(1, 15, 42), patient_name: "", is_multi_patient: true, order_type: "order", is_custom: false, order_status: "processing", payment_method: "clinic", is_paid: true, is_cancelled: false, total_price: 431.96, refunded_amount: 0, net_paid: 431.96, payment_timestamp: orderHistoryDaysAgo(1, 15, 44) },
   { order_id: "6b09e3d18f4a42c7953e2a8b06d1f7358c2ad490", created_at: orderHistoryDaysAgo(2, 11, 8), patient_name: "David Lim", is_multi_patient: false, order_type: "refill", is_custom: false, order_status: "shipped", payment_method: "clinic_ach", is_paid: true, is_cancelled: false, total_price: 55.88, refunded_amount: 0, net_paid: 55.88, payment_timestamp: orderHistoryDaysAgo(2, 11, 9), errorPage: "something-went-wrong" },
-  { order_id: "4e71a0c58d2b46f9812c5e3a97b0d64125f8ce37", created_at: orderHistoryDaysAgo(4, 14, 31), patient_name: "Maria Santos", is_multi_patient: false, order_type: "order", is_custom: true, order_status: "delivered", payment_method: "patient", is_paid: true, is_cancelled: false, total_price: 189.5, refunded_amount: 0, net_paid: 189.5, payment_timestamp: orderHistoryDaysAgo(4, 14, 35) },
+  { order_id: "4e71a0c58d2b46f9812c5e3a97b0d64125f8ce37", created_at: orderHistoryDaysAgo(4, 14, 31), patient_name: "Maria Santos", is_multi_patient: false, order_type: "order", is_custom: true, order_status: "delivered", payment_method: "patient", is_paid: true, is_cancelled: false, total_price: 189.5, refunded_amount: 0, net_paid: 189.5, payment_timestamp: orderHistoryDaysAgo(4, 14, 35), previewPage: "sales-catalog" },
   { order_id: "9c35b8e07f1d49a2864b0d7c53e9a18670e4b9a5", created_at: orderHistoryDaysAgo(6, 10, 2), patient_name: "John Reynolds", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "cancelled", payment_method: "clinic", is_paid: true, is_cancelled: true, total_price: 65.99, refunded_amount: 65.99, net_paid: 0, payment_timestamp: orderHistoryDaysAgo(6, 10, 5) },
   { order_id: "2a68d4f19c0e47b5923f8a1d65c0b39784c1d5f8", created_at: orderHistoryDaysAgo(8, 16, 55), patient_name: "Allison Johnson", is_multi_patient: false, order_type: "order", is_custom: false, order_status: "delivered", payment_method: "clinic", is_paid: true, is_cancelled: false, total_price: 145.0, refunded_amount: 25.0, net_paid: 120.0, payment_timestamp: orderHistoryDaysAgo(8, 17, 1) },
   { order_id: "7f50c2e94b8d41a6879e3c5f02a6d81b39e7f0a2", created_at: orderHistoryDaysAgo(10, 8, 47), patient_name: "Emily Krause", is_multi_patient: false, order_type: "refill", is_custom: false, order_status: "shipped", payment_method: "patient", is_paid: true, is_cancelled: false, total_price: 89.99, refunded_amount: 0, net_paid: 89.99, payment_timestamp: orderHistoryDaysAgo(10, 9, 0) },
@@ -5297,6 +5301,10 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   function openPatientOrder(order: OrderHistoryEntry) {
+    if (order.previewPage) {
+      onNavigate(order.previewPage);
+      return;
+    }
     if (order.errorPage) {
       setErrorPage(order.errorPage);
       return;
@@ -12934,6 +12942,10 @@ export default function App() {
     }
 
     return <LandingPage onLoginClick={() => setAuthView("login")} onRegisterClick={() => setAuthView("register")} onRequestDemoClick={() => setAuthView("request-demo")} onContactClick={() => setAuthView("contact")} />;
+  }
+
+  if (page === "sales-catalog") {
+    return <SalesCatalogAccessPage onCancel={() => setPage("order-history")} />;
   }
 
   const platformTourSteps = [
