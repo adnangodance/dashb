@@ -60,6 +60,22 @@ export function SidebarAlerts({ alerts, paused = false, priorityAlertId }: { ale
           </div>
         ))}
       </div>
+      {alerts.length > 1 && (
+        <div className="mt-1 flex items-center justify-center" aria-label="Choose an alert">
+          {alerts.map((alert, index) => (
+            <button
+              key={alert.id}
+              type="button"
+              onClick={() => setActiveId(alert.id)}
+              aria-label={`Show ${alert.label}`}
+              aria-current={index === activeIndex ? "true" : undefined}
+              className="group flex h-6 w-[9px] items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#2563eb]"
+            >
+              <span aria-hidden="true" className={`size-[5px] rounded-full transition-all duration-300 motion-reduce:transition-none ${index === activeIndex ? "scale-110 bg-[#66786b] shadow-[0_1px_3px_rgba(61,81,67,0.18)]" : "bg-[#d5dcd6] group-hover:bg-[#b6c1b8]"}`} />
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
