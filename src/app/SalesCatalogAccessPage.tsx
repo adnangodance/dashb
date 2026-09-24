@@ -110,10 +110,6 @@ export function SalesCatalogAccessPage({ onCancel }: { onCancel: () => void }) {
               </button>
               <button type="button" onClick={onCancel} className="mt-2 h-9 w-full rounded-full text-[11px] font-medium text-[#737d8c] transition-colors hover:bg-[#f2f6fc] hover:text-[#242b35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]">Cancel</button>
             </form>
-          <div className="mt-4 border-t border-[#e9edf3] pt-4 text-[11px] leading-[18px] text-[#858e9b]">
-            <p className="font-medium text-[#657080]">Don’t have an access code?</p>
-            <p className="mt-0.5">Check your invitation for your access code.</p>
-          </div>
         </section>
       </div>
     </main>

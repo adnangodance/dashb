@@ -51,6 +51,7 @@ type Props = {
   onSynced: () => void;
   // Resolve only after DoseSpot confirms the sync; reject on validation/failure.
   syncProfile?: (profile: EpcsProfile) => Promise<void>;
+  onOpenChange?: (open: boolean) => void;
 };
 
 function profileIssues(profile: EpcsProfile) {
@@ -73,24 +74,33 @@ function profileIssues(profile: EpcsProfile) {
   return issues;
 }
 
+export function needsEpcsSyncNotice(account: EpcsAccount) {
+  return account.role === "prescriber" && (account.doseSpotSyncRequired || Object.keys(profileIssues(account.profile)).length > 0);
+}
+
 export function EpcsSyncNotice(props: Props) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const incomplete = Object.keys(profileIssues(props.account.profile)).length > 0;
-  if (props.account.role !== "prescriber" || (!props.account.doseSpotSyncRequired && !incomplete)) return null;
+  useEffect(() => {
+    if (!open) return;
+    props.onOpenChange?.(true);
+    return () => props.onOpenChange?.(false);
+  }, [open, props.onOpenChange]);
+  if (!needsEpcsSyncNotice(props.account)) return null;
 
   return (
     <>
-      <div className="mt-3 w-full shrink-0 rounded-[18px] border border-white/70 bg-[radial-gradient(circle_at_90%_0%,rgba(255,214,178,0.95),transparent_48%),linear-gradient(145deg,#fffdf3_0%,#fbf0e5_100%)] p-3 shadow-[0_10px_28px_rgba(102,64,30,0.08)]">
+      <div className="flex h-full w-full flex-col rounded-[18px] border border-white/70 bg-[radial-gradient(circle_at_90%_0%,rgba(255,214,178,0.95),transparent_48%),linear-gradient(145deg,#fffdf3_0%,#fbf0e5_100%)] p-3 shadow-[0_10px_28px_rgba(102,64,30,0.08)]">
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.01em] text-[#211a15]">EPCS sync required</h3>
-        <p className="mt-1.5 text-[11px] leading-4 text-[#7a7068]">{incomplete ? "Complete and verify your profile before syncing to DoseSpot." : "Review your profile and sync your account to DoseSpot."}</p>
+        <p className="mb-3 mt-1.5 text-[11px] leading-4 text-[#7a7068]">{incomplete ? "Complete and verify your profile before syncing to DoseSpot." : "Review your profile and sync your account to DoseSpot."}</p>
         <button
           ref={trigger}
           type="button"
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-label="Review your profile and sync to DoseSpot"
-          className="group mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-3 py-2.5 text-[11px] font-semibold text-[#211a15] shadow-[0_3px_12px_rgba(102,64,30,0.06)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bd6b2e]"
+          className="group mt-auto flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-3 py-2.5 text-[11px] font-semibold text-[#211a15] shadow-[0_3px_12px_rgba(102,64,30,0.06)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bd6b2e]"
         >
           Review profile
           <ArrowUpRight size={13} strokeWidth={2} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" />

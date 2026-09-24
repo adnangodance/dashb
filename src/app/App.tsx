@@ -1,5 +1,7 @@
 import { EnrollmentModal } from "./EnrollmentModal";
-import { DEMO_EPCS_ACCOUNT, EpcsSyncNotice, type EpcsAccount, type EpcsProfile } from "./EpcsSyncNotice";
+import { DEMO_EPCS_ACCOUNT, EpcsSyncNotice, needsEpcsSyncNotice, type EpcsAccount, type EpcsProfile } from "./EpcsSyncNotice";
+import { SidebarAlerts, type SidebarAlert } from "./SidebarAlerts";
+import { StateLicenseDrawer, StateLicenseNotice, StateLicenseUpload, useStateLicenseDocument, type StateLicenseController } from "./StateLicenseDocument";
 import { CartConflictModal } from "./CartConflictModal";
 import { CartVoucherField, OrderTotalVouchers } from "./CartVoucherField";
 import { PatientEpcsStatus, PatientEpcsNotice, type EpcsStatus } from "./PatientEpcsStatus";
@@ -513,6 +515,7 @@ function NavItem({
 function Sidebar({
   active,
   epcsAccount,
+  stateLicense,
   onEpcsProfileSave,
   onEpcsSynced,
   onNavigate,
@@ -529,6 +532,7 @@ function Sidebar({
 }: {
   active: Page;
   epcsAccount: EpcsAccount;
+  stateLicense: StateLicenseController;
   onEpcsProfileSave: (profile: EpcsProfile) => void;
   onEpcsSynced: () => void;
   onNavigate: (p: Page) => void;
@@ -640,7 +644,10 @@ function Sidebar({
 
       <SidebarSupportVersion
         onNavigate={onNavigate}
-        replacementNotice={<EpcsSyncNotice account={epcsAccount} onSave={onEpcsProfileSave} onSynced={onEpcsSynced} />}
+        epcsAccount={epcsAccount}
+        stateLicense={stateLicense}
+        onEpcsProfileSave={onEpcsProfileSave}
+        onEpcsSynced={onEpcsSynced}
       />
       <div className="shrink-0 pb-3 pt-4">
         <UserChip onNavigate={onNavigate} onLogout={onLogout} />
@@ -649,13 +656,23 @@ function Sidebar({
   );
 }
 
-function SidebarSupportVersion({ onNavigate, replacementNotice }: { onNavigate: (p: Page) => void; replacementNotice?: ReactNode }) {
+function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsProfileSave, onEpcsSynced }: {
+  onNavigate: (p: Page) => void;
+  epcsAccount: EpcsAccount;
+  stateLicense: StateLicenseController;
+  onEpcsProfileSave: (profile: EpcsProfile) => void;
+  onEpcsSynced: () => void;
+}) {
   const paymentNoticeActive = () => Number(window.sessionStorage.getItem("clinic-card-notice-until") ?? 0) > Date.now();
   const accounts = [
     { name: "Zee Pharmacy", location: "Bronx, NY" },
     { name: "Altin Clinic", location: "Queens County, NY" },
   ];
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [epcsDrawerOpen, setEpcsDrawerOpen] = useState(false);
+  const [licenseDrawerOpen, setLicenseDrawerOpen] = useState(false);
+  const licenseTrigger = useRef<HTMLElement | null>(null);
+  const accountSwitchButton = useRef<HTMLButtonElement>(null);
   const [selectedAccount, setSelectedAccount] = useState(accounts[0]);
   const [clinicPaymentEnabled, setClinicPaymentEnabled] = useState(() => window.sessionStorage.getItem("clinic-card-saved") === "true");
   const [clinicPaymentNoticeVisible, setClinicPaymentNoticeVisible] = useState(true);
@@ -686,6 +703,50 @@ function SidebarSupportVersion({ onNavigate, replacementNotice }: { onNavigate: 
     return () => window.clearTimeout(timeout);
   }, [clinicPaymentNoticeVisible, clinicPaymentUpdated]);
 
+  const alerts: SidebarAlert[] = [];
+  if (needsEpcsSyncNotice(epcsAccount)) {
+    alerts.push({
+      id: "epcs",
+      label: "EPCS sync required",
+      content: <EpcsSyncNotice account={epcsAccount} onSave={onEpcsProfileSave} onSynced={onEpcsSynced} onOpenChange={setEpcsDrawerOpen} />,
+    });
+  }
+  if (clinicPaymentNoticeVisible) {
+    alerts.push({
+      id: "payment",
+      label: clinicPaymentUpdated ? "Card updated" : "Update payment card",
+      content: (
+        <div className={`flex h-full flex-col rounded-[18px] border border-white/70 p-3 shadow-[0_10px_28px_rgba(38,54,45,0.08)] ${clinicPaymentUpdated ? "bg-[radial-gradient(circle_at_90%_0%,rgba(191,219,254,0.98),transparent_52%),linear-gradient(145deg,#eff6ff_0%,#dbeafe_100%)]" : "bg-[radial-gradient(circle_at_90%_0%,rgba(223,244,238,0.95),transparent_48%),linear-gradient(145deg,#fbfff3_0%,#f8f3e9_100%)]"}`}>
+          <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.01em] text-[#171A18]">{clinicPaymentUpdated ? "Card updated" : "Update payment card"}</h3>
+          <p className="mb-3 mt-1.5 text-[11px] leading-4 text-[#737A75]">{clinicPaymentUpdated ? "Your new payment card is ready to use." : "Please review your saved card before placing your next order."}</p>
+          <button
+            type="button"
+            onClick={() => {
+              const eventName = clinicPaymentEnabled ? "open-payment-overview" : "open-payment-setup";
+              window.sessionStorage.setItem(eventName, "true");
+              window.dispatchEvent(new Event(eventName));
+              onNavigate("settings");
+            }}
+            className="group mt-auto flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-3 py-2.5 text-[11px] font-semibold text-[#171A18] shadow-[0_3px_12px_rgba(34,46,39,0.06)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+          >
+            {clinicPaymentUpdated ? "Manage payment" : "Update card"}
+            <ArrowUpRight size={13} strokeWidth={2} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+      ),
+    });
+  }
+  if (epcsAccount.role === "prescriber" && !stateLicense.record?.document && (stateLicense.record || stateLicense.error)) {
+    alerts.push({
+      id: "state-license",
+      label: "Account incomplete",
+      content: <StateLicenseNotice license={stateLicense} onUpload={() => {
+        licenseTrigger.current = document.activeElement as HTMLElement;
+        setLicenseDrawerOpen(true);
+      }} />,
+    });
+  }
+
   return (
     <div className="shrink-0 border-y border-[#ECEEEA] py-4">
       <div className="mb-3 flex items-center gap-2 px-1 text-[#8c948f]">
@@ -708,7 +769,7 @@ function SidebarSupportVersion({ onNavigate, replacementNotice }: { onNavigate: 
         ))}
       </div>
       <div className="relative mt-3">
-        <button type="button" onClick={() => setAccountMenuOpen(current => !current)} className="flex w-full cursor-pointer items-center gap-2 rounded-[10px] bg-[var(--app-menu-bg)] px-2.5 py-2 text-left transition-colors hover:bg-[#EEF0EF]" aria-expanded={accountMenuOpen}>
+        <button ref={accountSwitchButton} type="button" onClick={() => setAccountMenuOpen(current => !current)} className="flex w-full cursor-pointer items-center gap-2 rounded-[10px] bg-[var(--app-menu-bg)] px-2.5 py-2 text-left transition-colors hover:bg-[#EEF0EF]" aria-expanded={accountMenuOpen}>
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-[12px] font-medium leading-[15px] text-[#1f2220]">{selectedAccount.name}</span>
@@ -743,25 +804,14 @@ function SidebarSupportVersion({ onNavigate, replacementNotice }: { onNavigate: 
           </div>
         )}
       </div>
-      {replacementNotice ?? (clinicPaymentNoticeVisible && (
-        <div className={`mt-2 rounded-[18px] border border-white/70 p-3 shadow-[0_10px_28px_rgba(38,54,45,0.08)] ${clinicPaymentUpdated ? "bg-[radial-gradient(circle_at_90%_0%,rgba(191,219,254,0.98),transparent_52%),linear-gradient(145deg,#eff6ff_0%,#dbeafe_100%)]" : "bg-[radial-gradient(circle_at_90%_0%,rgba(223,244,238,0.95),transparent_48%),linear-gradient(145deg,#fbfff3_0%,#f8f3e9_100%)]"}`}>
-            <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.01em] text-[#171A18]">{clinicPaymentUpdated ? "Card updated" : "Update payment card"}</h3>
-            <p className="mt-1.5 text-[11px] leading-[16px] text-[#737A75]">{clinicPaymentUpdated ? "Your new payment card is ready to use." : "Please review your saved card before placing your next order."}</p>
-            <button
-              type="button"
-              onClick={() => {
-                const eventName = clinicPaymentEnabled ? "open-payment-overview" : "open-payment-setup";
-                window.sessionStorage.setItem(eventName, "true");
-                window.dispatchEvent(new Event(eventName));
-                onNavigate("settings");
-              }}
-              className="group mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-3 py-2.5 text-[11px] font-semibold text-[#171A18] shadow-[0_3px_12px_rgba(34,46,39,0.06)] transition-transform hover:-translate-y-0.5"
-            >
-              {clinicPaymentUpdated ? "Manage payment" : "Update card"}
-              <ArrowUpRight size={13} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5" />
-            </button>
-          </div>
-      ))}
+      <SidebarAlerts alerts={alerts} paused={accountMenuOpen || epcsDrawerOpen || licenseDrawerOpen} priorityAlertId={clinicPaymentUpdated ? "payment" : stateLicense.record?.skippedAt && !stateLicense.record.document ? "state-license" : undefined} />
+      {licenseDrawerOpen && <StateLicenseDrawer license={stateLicense} onClose={() => {
+        setLicenseDrawerOpen(false);
+        window.requestAnimationFrame(() => {
+          if (licenseTrigger.current?.isConnected) licenseTrigger.current.focus();
+          else accountSwitchButton.current?.focus();
+        });
+      }} />}
     </div>
   );
 }
@@ -11191,8 +11241,8 @@ function BusinessSelectionPage({ onSelect, onBack }: { onSelect: (business: stri
   );
 }
 
-function OrganizationSetupPage({ onCreate }: { onCreate: () => void }) {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+function OrganizationSetupPage({ onCreate, stateLicense }: { onCreate: () => void; stateLicense: StateLicenseController }) {
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -11232,10 +11282,14 @@ function OrganizationSetupPage({ onCreate }: { onCreate: () => void }) {
       subtitle: "Please provide your professional credentials.",
     },
     4: {
+      title: "State License Document",
+      subtitle: "Add a clear copy of your current state license.",
+    },
+    5: {
       title: "Set Your Digital Signature",
       subtitle: "Draw your signature below. This will be used on your prescriptions.",
     },
-    5: {
+    6: {
       title: "Add Pay by Clinic Card",
       subtitle: "Add a credit card for subscription and payment processing.",
     },
@@ -11258,7 +11312,7 @@ function OrganizationSetupPage({ onCreate }: { onCreate: () => void }) {
             <div className="text-center">
               <h1 className="text-[21px] font-semibold tracking-[-0.025em]">{activeStepContent.title}</h1>
               <p className="mt-1.5 text-[11px] text-[#747c78]">{activeStepContent.subtitle}</p>
-              <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3974d8]">Step {currentStep} of 5</p>
+              <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3974d8]">Step {currentStep} of 6</p>
             </div>
 
             <div className="my-6 h-px bg-[#eceeec]" />
@@ -11326,13 +11380,15 @@ function OrganizationSetupPage({ onCreate }: { onCreate: () => void }) {
                 </div>
               </form>
             </> : currentStep === 4 ? <>
+              <StateLicenseUpload license={stateLicense} onContinue={() => setCurrentStep(5)} onSkip={() => setCurrentStep(5)} onBack={() => setCurrentStep(3)} />
+            </> : currentStep === 5 ? <>
               <SignaturePad />
               <div className="mt-4 space-y-2">
-                <button type="button" onClick={() => setCurrentStep(5)} className="h-10 w-full rounded-[8px] bg-[#111] px-6 text-[11px] font-semibold text-white hover:bg-[#183229]">Continue</button>
-                <button type="button" onClick={() => setCurrentStep(3)} className="h-9 w-full rounded-[8px] text-[11px] font-semibold text-[#4f5753] hover:bg-white/70 hover:text-[#183229]">Back</button>
+                <button type="button" onClick={() => setCurrentStep(6)} className="h-10 w-full rounded-[8px] bg-[#111] px-6 text-[11px] font-semibold text-white hover:bg-[#183229]">Continue</button>
+                <button type="button" onClick={() => setCurrentStep(4)} className="h-9 w-full rounded-[8px] text-[11px] font-semibold text-[#4f5753] hover:bg-white/70 hover:text-[#183229]">Back</button>
               </div>
             </> : <>
-              <PaymentMethodOnboardingStep onBack={() => setCurrentStep(4)} onComplete={onCreate} />
+              <PaymentMethodOnboardingStep onBack={() => setCurrentStep(5)} onComplete={onCreate} />
             </>}
           </div>
         </div>
@@ -12497,6 +12553,7 @@ function PageContentSkeleton({ page }: { page: Page }) {
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [epcsAccount, setEpcsAccount] = useState<EpcsAccount>(DEMO_EPCS_ACCOUNT);
+  const stateLicense = useStateLicenseDocument(epcsAccount.id);
   const [authView, setAuthView] = useState<"landing" | "login" | "business-select" | "organization" | "register" | "single-sign-on" | "request-demo" | "contact">("landing");
   const [appTheme, setAppTheme] = useState<AppTheme>(() => {
     const savedTheme = window.localStorage.getItem("scriptlinkrx-theme");
@@ -12914,6 +12971,7 @@ export default function App() {
     if (authView === "organization") {
       return (
         <OrganizationSetupPage
+          stateLicense={stateLicense}
           onCreate={() => {
             setIsAuthenticated(true);
             setPlatformTourStep(0);
@@ -12993,6 +13051,7 @@ export default function App() {
             <Sidebar
               active={page === "not-found" || page === "something-went-wrong" ? "order-history" : page}
               epcsAccount={epcsAccount}
+              stateLicense={stateLicense}
               onEpcsProfileSave={profile => setEpcsAccount(current => ({ ...current, profile, doseSpotSyncRequired: true }))}
               onEpcsSynced={() => setEpcsAccount(current => ({ ...current, doseSpotSyncRequired: false }))}
               onNavigate={setPage}
