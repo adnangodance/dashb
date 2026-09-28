@@ -112,6 +112,7 @@ export function LandingPartners() {
   </section>;
 }
 
+const maxCount = Math.max(...coverage.states.map(state => state.partners.length), 1);
 const mapClass = (name: string) => `slrx-coverage-map-section-${name}`;
 type MapState = typeof coverage.states[number];
 type Selection = { state: MapState; x: number; y: number };
@@ -145,7 +146,8 @@ export function LandingCoverage() {
   const fill = (state: MapState) => {
     if (selection && selection.state.id === state.id) return "#244c7e";
     if (!state.partners.length) return "#edf2f7";
-    return "url(#slrx-coverage-product-gradient)";
+    const ratio = state.partners.length / maxCount;
+    return ratio <= 0.34 ? "#d6e5f2" : ratio <= 0.67 ? "#b3cde4" : "#8fafd0";
   };
 
   function select(event: MouseEvent<SVGElement> | KeyboardEvent<SVGElement>, state: MapState) {
@@ -169,27 +171,7 @@ export function LandingCoverage() {
         <div ref={contentRef} className={mapClass("map-content")} onClick={() => setSelection(null)}>
           <div className={`${mapClass("map")} ${inView ? mapClass("map-in-view") : ""}`}>
             <svg viewBox="-30 55 820 510" width="100%" aria-label="Pharmacy coverage by state">
-              <defs>
-                <linearGradient id="slrx-coverage-base" gradientUnits="userSpaceOnUse" x1="135" y1="0" x2="625" y2="620">
-                  <stop stopColor="#e5f0f7" />
-                  <stop offset=".45" stopColor="#f4f9fb" />
-                  <stop offset="1" stopColor="#d6ebe8" />
-                </linearGradient>
-                <radialGradient id="slrx-coverage-blue" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(93 55) scale(820 510)">
-                  <stop stopColor="#c8e2f3" stopOpacity=".6" />
-                  <stop offset=".55" stopColor="#c8e2f3" stopOpacity="0" />
-                </radialGradient>
-                <radialGradient id="slrx-coverage-seafoam" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="translate(790 463) scale(820 510)">
-                  <stop stopColor="#bce1dd" stopOpacity=".6" />
-                  <stop offset=".55" stopColor="#bce1dd" stopOpacity="0" />
-                </radialGradient>
-                <pattern id="slrx-coverage-product-gradient" x="-30" y="55" width="820" height="510" patternUnits="userSpaceOnUse" viewBox="-30 55 820 510">
-                  <rect x="-30" y="55" width="820" height="510" fill="url(#slrx-coverage-base)" />
-                  <rect x="-30" y="55" width="820" height="510" fill="url(#slrx-coverage-seafoam)" />
-                  <rect x="-30" y="55" width="820" height="510" fill="url(#slrx-coverage-blue)" />
-                </pattern>
-              </defs>
-              {coverage.states.map(state => <path key={state.name} d={state.path} fill={fill(state)} stroke="#c3d7df" strokeWidth=".7"
+              {coverage.states.map(state => <path key={state.name} d={state.path} fill={fill(state)} stroke="#f8fbff" strokeWidth="1"
                 className={mapClass("geography")} role={state.id ? "button" : undefined} tabIndex={state.id ? 0 : undefined}
                 aria-label={`${state.name}: ${state.partners.length} pharmacies licensed`} aria-pressed={state.id ? selection?.state.id === state.id : undefined}
                 onClick={event => select(event, state)} onKeyDown={event => select(event, state)} />)}
