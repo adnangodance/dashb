@@ -1,0 +1,77 @@
+[
+  {
+    "name": "Pharmacy R",
+    "image": "partner-1.png",
+    "square": false
+  },
+  {
+    "name": "Pharmacy P",
+    "image": "partner-2.svg",
+    "square": false
+  },
+  {
+    "name": "Pharmacy S",
+    "image": "partner-3.svg",
+    "square": false
+  },
+  {
+    "name": "Pharmacy A",
+    "image": "partner-4.png",
+    "square": false
+  },
+  {
+    "name": "Pharmacy C",
+    "image": "partner-5.jpg",
+    "square": false
+  },
+  {
+    "name": "Pharmacy O",
+    "image": "partner-6.png",
+    "square": false
+  },
+  {
+    "name": "Pharmacy RT",
+    "image": "partner-7.png",
+    "square": false
+  },
+  {
+    "name": "Pharmacy T",
+    "image": "partner-8.png",
+    "square": false
+  },
+  {
+    "name": "Pharmacy D",
+    "image": "partner-9.webp",
+    "square": false
+  },
+  {
+    "name": "Pharmacy V",
+    "image": "partner-10.webp",
+    "square": false
+  },
+  {
+    "name": "Pharmacy W",
+    "image": "partner-11.png",
+    "square": false
+  },
+  {
+    "name": "Pharmacy E",
+    "image": "partner-12.png",
+    "square": true
+  },
+  {
+    "name": "Pharmacy SC",
+    "image": "partner-13.png",
+    "square": false
+  },
+  {
+    "name": "Carie Boyd",
+    "image": "partner-14.svg",
+    "square": false
+  },
+  {
+    "name": "Pharmacy N",
+    "image": "partner-15.webp",
+    "square": false
+  }
+]

@@ -1,0 +1,43 @@
+/* Product and journey sections expand from a rounded panel to full width. */
+.slrx-section-stage {
+  position: relative;
+  display: flow-root;
+  background: #fff;
+  --section-background: radial-gradient(ellipse at 15% 0%, #c8e2f399, transparent 55%), radial-gradient(ellipse at 100% 80%, #bce1dd99, transparent 55%), linear-gradient(145deg, #e5f0f7 0%, #f4f9fb 45%, #d6ebe8 100%);
+  --section-scale: 1;
+  --section-radius: 0px;
+  --section-shadow: 0;
+}
+
+.slrx-section-stage[data-tone="journey"] {
+  --section-background: radial-gradient(ellipse at 12% 80%, #deede680, transparent 52%), linear-gradient(135deg, #f3f7f9, #f6f8f3);
+}
+
+.slrx-section-surface {
+  position: relative;
+  display: flow-root;
+  isolation: isolate;
+  overflow: clip;
+  background: var(--section-background);
+  border-radius: var(--section-radius);
+  transform: scale(var(--section-scale));
+  transform-origin: 50% 42%;
+  box-shadow: 0 28px 72px rgb(32 52 66 / var(--section-shadow));
+}
+
+.slrx-section-stage[data-entering="true"] > .slrx-section-surface { will-change: transform; }
+
+/* The surface owns the outer background and corners; card layouts stay local. */
+.slrx-landing .slrx-section-surface > :is(.injection-experience, .slrx-journey) {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slrx-section-surface { transform: none; border-radius: 0; box-shadow: none; will-change: auto; }
+}
+
+@media print {
+  .slrx-section-surface { transform: none; border-radius: 0; box-shadow: none; }
+}

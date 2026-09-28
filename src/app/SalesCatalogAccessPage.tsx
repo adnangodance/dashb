@@ -4,7 +4,7 @@ import scriptlinkrxLogo from "@/assets/scriptlinkrx-logo.svg";
 
 const CODE_LENGTH = 6;
 
-export function SalesCatalogAccessPage({ onCancel }: { onCancel: () => void }) {
+export function SalesCatalogAccessPage({ onCancel, backLabel = "Return to order history" }: { onCancel: () => void; backLabel?: string }) {
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
   const [notice, setNotice] = useState<string | null>(null);
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
@@ -64,7 +64,7 @@ export function SalesCatalogAccessPage({ onCancel }: { onCancel: () => void }) {
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#fbfcfe] px-5 py-10 font-['Inter',sans-serif] text-[#171717]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_65%_at_50%_0%,#dbe8ff_0%,#edf4ff_45%,transparent_100%)]" />
       <div className="relative w-full max-w-[470px]">
-        <button type="button" onClick={onCancel} aria-label="Return to order history" className="mx-auto mb-5 flex min-h-[38px] items-center gap-2.5 rounded-[8px] px-2 py-1 transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]">
+        <button type="button" onClick={onCancel} aria-label={backLabel} className="mx-auto mb-5 flex min-h-[38px] items-center gap-2.5 rounded-[8px] px-2 py-1 transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]">
           <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[27px] w-8 object-contain" />
           <span aria-hidden="true" className="font-['Poppins',sans-serif] text-[15px] font-semibold uppercase tracking-wide text-[#183229]">S<span className="lowercase">CRIPTLINKrx</span></span>
         </button>

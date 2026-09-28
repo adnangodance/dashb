@@ -1,0 +1,88 @@
+.slrx-trust-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 32px 44px;
+}
+
+.slrx-trust-panel {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .75);
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .65), rgba(255, 255, 255, .22) 52%, rgba(255, 255, 255, .4));
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  backdrop-filter: blur(24px) saturate(1.15);
+  box-shadow: 0 16px 44px rgba(66, 104, 121, .07), inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(255, 255, 255, .3);
+}
+.slrx-trust-pharmacies { position: relative; padding: 35px 28px 30px; }
+.slrx-trust-pharmacies h2 {
+  padding-inline: 24px;
+  color: #627b87;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: center;
+  letter-spacing: -.02em;
+}
+
+.slrx-trust-viewport {
+  margin-top: 30px;
+  overflow-x: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 44px, #000 calc(100% - 44px), transparent);
+}
+
+.slrx-trust-viewport:focus-visible { outline: 2px solid #315b70; outline-offset: 4px; border-radius: 4px; }
+.slrx-trust-track { display: flex; width: max-content; animation: slrx-pharmacy-scroll 55s linear infinite; }
+.slrx-trust-logo-group { display: flex; align-items: center; flex-shrink: 0; gap: 42px; padding-right: 42px; }
+.slrx-trust-logo-slot { display: grid; place-items: center; flex: 0 0 160px; width: 160px; height: 72px; }
+.slrx-trust-logo { width: auto; height: auto; max-width: 152px; max-height: 46px; object-fit: contain; filter: grayscale(1); opacity: .83; }
+.slrx-trust-logo-square { max-width: 72px; max-height: 68px; }
+.slrx-trust-viewport:hover .slrx-trust-track,
+.slrx-trust-viewport:focus-within .slrx-trust-track { animation-play-state: paused !important; }
+
+.slrx-trust-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border-top: 1px solid rgba(255, 255, 255, .65); background: rgba(207, 228, 233, .18); }
+.slrx-trust-fact { display: flex; flex-direction: column-reverse; gap: 12px; padding: 34px 20px 32px; text-align: center; }
+.slrx-trust-fact + .slrx-trust-fact { border-left: 1px solid rgba(255, 255, 255, .65); }
+.slrx-trust-fact dt { color: #627b87; font-size: 14px; line-height: 1.5; }
+.slrx-trust-fact dd { margin: 0; color: #17394b; font-family: var(--slrx-display-font); font-size: 48px; font-weight: 600; letter-spacing: -.045em; line-height: 1.1; }
+.slrx-trust-section .slrx-trust-disclaimer { margin-top: 16px; color: #6a7e87; font-size: 10px; line-height: 1.5; text-align: center; }
+
+@keyframes slrx-pharmacy-scroll { to { transform: translateX(-50%); } }
+
+@media (max-width: 999px) {
+  .slrx-trust-section { padding: 28px 24px 36px; }
+  .slrx-trust-pharmacies { padding: 30px 20px 26px; }
+  .slrx-trust-pharmacies h2 { font-size: 16px; }
+  .slrx-trust-logo-group { gap: 30px; padding-right: 30px; }
+  .slrx-trust-logo-slot { flex-basis: 140px; width: 140px; height: 64px; }
+  .slrx-trust-logo { max-width: 132px; max-height: 42px; }
+  .slrx-trust-logo-square { max-width: 62px; max-height: 60px; }
+  .slrx-trust-fact { padding: 28px 12px; gap: 10px; }
+  .slrx-trust-fact dd { font-size: 40px; }
+  .slrx-trust-fact dt { font-size: 12px; }
+}
+
+@media (max-width: 600px) {
+  .slrx-trust-section { padding: 22px 20px 30px; }
+  .slrx-trust-panel { border-radius: 20px; }
+  .slrx-trust-pharmacies { padding: 25px 12px 22px; }
+  .slrx-trust-pharmacies h2 { max-width: 270px; margin-inline: auto; padding-inline: 22px; font-size: 14px; line-height: 1.5; text-wrap: balance; }
+  .slrx-trust-viewport { margin-top: 22px; mask-image: linear-gradient(to right, transparent, #000 22px, #000 calc(100% - 22px), transparent); }
+  .slrx-trust-logo-group { gap: 24px; padding-right: 24px; }
+  .slrx-trust-logo-slot { flex-basis: 120px; width: 120px; height: 56px; }
+  .slrx-trust-logo { max-width: 112px; max-height: 38px; }
+  .slrx-trust-logo-square { max-width: 52px; max-height: 52px; }
+  .slrx-trust-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .slrx-trust-fact:nth-child(3) { border-left: 0; }
+  .slrx-trust-fact:nth-child(n + 3) { border-top: 1px solid rgba(255, 255, 255, .65); }
+  .slrx-trust-fact { padding: 23px 10px; gap: 7px; }
+  .slrx-trust-fact dd { font-size: 36px; }
+  .slrx-trust-fact dt { font-size: 11px; }
+  .slrx-trust-section .slrx-trust-disclaimer { font-size: 9px; padding-inline: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slrx-trust-track { animation: none; }
+  .slrx-trust-logo-group-copy { display: none; }
+  .slrx-trust-viewport { overflow-x: auto; scrollbar-width: thin; }
+  .slrx-trust-logo-group { padding-inline: 22px; }
+}
