@@ -7,11 +7,13 @@
   {
     "name": "Pharmacy P",
     "image": "partner-2.svg",
+    "monochrome": "white-details",
     "square": false
   },
   {
     "name": "Pharmacy S",
     "image": "partner-3.svg",
+    "monochrome": "white-details",
     "square": false
   },
   {
@@ -22,6 +24,7 @@
   {
     "name": "Pharmacy C",
     "image": "partner-5.jpg",
+    "monochrome": "white-background",
     "square": false
   },
   {
@@ -62,6 +65,7 @@
   {
     "name": "Pharmacy SC",
     "image": "partner-13.png",
+    "monochrome": "white-details",
     "square": false
   },
   {
@@ -72,6 +76,7 @@
   {
     "name": "Pharmacy N",
     "image": "partner-15.webp",
+    "monochrome": "white-background",
     "square": false
   }
 ]

@@ -60,6 +60,7 @@ function PartnerLogo({ partner, duplicate = false }: { partner: typeof partners[
   const [square, setSquare] = useState(partner.square);
   return <img src={landingAsset(partner.image)} alt={duplicate ? "" : partner.name} loading="lazy" decoding="async"
     className={`slrx-trust-logo ${square ? "slrx-trust-logo-square" : ""}`}
+    data-monochrome={partner.monochrome}
     onLoad={event => {
       const { naturalWidth, naturalHeight } = event.currentTarget;
       setSquare(naturalHeight > 0 && naturalWidth / naturalHeight < 1.25);
@@ -88,6 +89,15 @@ export function LandingPartners() {
   }, []);
 
   return <section ref={sectionRef} id="our-partners" className="slrx-trust-section" aria-labelledby="slrx-trust-heading">
+    <svg className="slrx-trust-logo-filter" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="slrx-white-background-logo" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+          {/* Only the two opaque originals need white removal; preserve the others' alpha edges. */}
+          <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -.34016 -1.14432 -.11552 0 1.55" />
+          <feComposite in2="SourceAlpha" operator="in" />
+        </filter>
+      </defs>
+    </svg>
     <div className="slrx-trust-panel">
       <div className="slrx-trust-pharmacies">
         <h2 id="slrx-trust-heading">Trusted by leading compounding pharmacies</h2>

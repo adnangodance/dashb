@@ -34,7 +34,11 @@
 .slrx-trust-track { display: flex; width: max-content; animation: slrx-pharmacy-scroll 55s linear infinite; }
 .slrx-trust-logo-group { display: flex; align-items: center; flex-shrink: 0; gap: 42px; padding-right: 42px; }
 .slrx-trust-logo-slot { display: grid; place-items: center; flex: 0 0 160px; width: 160px; height: 72px; }
-.slrx-trust-logo { width: auto; height: auto; max-width: 152px; max-height: 46px; object-fit: contain; filter: grayscale(1); opacity: .83; }
+.slrx-trust-logo-filter { position: absolute; width: 0; height: 0; pointer-events: none; }
+.slrx-trust-logo { width: auto; height: auto; max-width: 152px; max-height: 46px; object-fit: contain; filter: brightness(0); }
+/* Keep the original alpha edges; white cutouts and opaque backgrounds need separate treatment. */
+.slrx-trust-logo[data-monochrome="white-details"] { filter: grayscale(1) brightness(.65) contrast(5); }
+.slrx-trust-logo[data-monochrome="white-background"] { max-width: 180px; max-height: 56px; filter: url(#slrx-white-background-logo); }
 .slrx-trust-logo-square { max-width: 72px; max-height: 68px; }
 .slrx-trust-viewport:hover .slrx-trust-track,
 .slrx-trust-viewport:focus-within .slrx-trust-track { animation-play-state: paused !important; }
@@ -55,6 +59,7 @@
   .slrx-trust-logo-group { gap: 30px; padding-right: 30px; }
   .slrx-trust-logo-slot { flex-basis: 140px; width: 140px; height: 64px; }
   .slrx-trust-logo { max-width: 132px; max-height: 42px; }
+  .slrx-trust-logo[data-monochrome="white-background"] { max-width: 156px; max-height: 50px; }
   .slrx-trust-logo-square { max-width: 62px; max-height: 60px; }
   .slrx-trust-fact { padding: 28px 12px; gap: 10px; }
   .slrx-trust-fact dd { font-size: 40px; }
@@ -70,6 +75,7 @@
   .slrx-trust-logo-group { gap: 24px; padding-right: 24px; }
   .slrx-trust-logo-slot { flex-basis: 120px; width: 120px; height: 56px; }
   .slrx-trust-logo { max-width: 112px; max-height: 38px; }
+  .slrx-trust-logo[data-monochrome="white-background"] { max-width: 132px; max-height: 46px; }
   .slrx-trust-logo-square { max-width: 52px; max-height: 52px; }
   .slrx-trust-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .slrx-trust-fact:nth-child(3) { border-left: 0; }
