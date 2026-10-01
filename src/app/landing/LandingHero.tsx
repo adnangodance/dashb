@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { landingAsset } from "./assets";
+import nandroloneDecanoateVial from "../../assets/landing-reference/nandrolone-decanoate-vial.png";
+import semaglutidePyridoxineVial from "../../assets/landing-reference/semaglutide-pyridoxine-vial.png";
 import "./LandingHero.css";
 
 const navigation = [
@@ -63,8 +65,8 @@ export function LandingHero() {
         <div className="slrx-hero-artwork" aria-hidden="true">
           <div className="slrx-hero-showcase">
             <div className="slrx-hero-stage-shadow" />
-            <img className="slrx-hero-product slrx-hero-product-left" src={landingAsset("Product-image-6.png")} width="480" height="640" alt="" decoding="async" />
-            <img className="slrx-hero-product slrx-hero-product-right" src={landingAsset("Product-image-4.png")} width="960" height="1280" alt="" decoding="async" />
+            <img className="slrx-hero-product slrx-hero-product-left" src={semaglutidePyridoxineVial} width="916" height="1142" alt="" decoding="async" />
+            <img className="slrx-hero-product slrx-hero-product-right" src={nandroloneDecanoateVial} width="423" height="581" alt="" decoding="async" />
             <img className="slrx-hero-product slrx-hero-product-center" src={landingAsset("Product-image-1.png")} width="960" height="1280" alt="" decoding="async" fetchPriority="high" />
           </div>
         </div>

@@ -164,8 +164,9 @@
 }
 
 /* Keep the approved three-vial arrangement, now centered above the headline. */
-.slrx-hero-product-left { width: 46%; left: 9%; top: 27%; transform: rotate(-17deg); }
-.slrx-hero-product-right { width: 55%; right: -8%; top: 22%; transform: rotate(15deg); }
+/* Account for the supplied images' padding while preserving each vial's visible height and center. */
+.slrx-hero-product-left { width: 43.89%; left: 10.03%; top: 30.86%; transform: rotate(-17deg); }
+.slrx-hero-product-right { width: 47.69%; right: -4.31%; top: 28.23%; transform: rotate(15deg); }
 .slrx-hero-product-center { width: 62%; left: 20%; top: 4%; transform: rotate(-5deg); }
 
 .slrx-hero-copy {
