@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { InjectionFeatures } from "./InjectionFeatures";
-import tirzepatidePyridoxineVial from "../../assets/landing-reference/tirzepatide-pyridoxine-vial.png";
+import tesamorelinIpamorelinVial from "../../assets/landing-reference/tesamorelin-ipamorelin-vial.png";
 import nadInjectionVial from "../../assets/landing-reference/nad-injection-vial-v2.png";
 import "./InjectionSection.css";
 
@@ -25,7 +25,7 @@ export function InjectionSection() {
         </g>)}
       </svg>
       <div className="injection-editorial-art">
-        <img className="injection-editorial-bottle injection-editorial-bottle-back" src={tirzepatidePyridoxineVial} alt="Tirzepatide / Pyridoxine (B6) vial" width="3284" height="4104" loading="lazy" decoding="async" />
+        <img className="injection-editorial-bottle injection-editorial-bottle-back" src={tesamorelinIpamorelinVial} alt="Tesamorelin / Ipamorelin vial" width="480" height="640" loading="lazy" decoding="async" />
         <img className="injection-editorial-bottle injection-editorial-bottle-front" src={nadInjectionVial} alt="Nicotinamide Adenine Dinucleotide (NAD+) injection vial" width="916" height="1142" loading="lazy" decoding="async" />
       </div>
       <div className="injection-editorial-actions">

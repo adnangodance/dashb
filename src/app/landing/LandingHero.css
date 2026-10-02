@@ -165,7 +165,7 @@
 
 /* Keep the approved three-vial arrangement, now centered above the headline. */
 /* Account for the supplied images' padding while preserving each vial's visible height and center. */
-.slrx-hero-product-left { width: 43.89%; left: 10.03%; top: 30.86%; transform: rotate(-17deg); }
+.slrx-hero-product-left { width: 46.09%; left: 8.53%; top: 26.33%; transform: rotate(-17deg); }
 .slrx-hero-product-right { width: 47.69%; right: -4.31%; top: 28.23%; transform: rotate(15deg); }
 .slrx-hero-product-center { width: 62%; left: 20%; top: 4%; transform: rotate(-5deg); }
 
