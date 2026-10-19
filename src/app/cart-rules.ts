@@ -2,6 +2,12 @@ export type CatalogType = "503A" | "503B";
 export type CartConflict = { existingType: CatalogType; incomingType: CatalogType };
 type CatalogItem = { catalogType?: CatalogType; qty?: number };
 
+// Count charges within one pharmacy, using active patients rather than item quantities.
+export function getShippingChargeCount(patientCount: number, paymentMethod: "patient" | "clinic") {
+  if (patientCount <= 0) return 0;
+  return paymentMethod === "clinic" ? 1 : patientCount;
+}
+
 export const productCatalogType = (item: CatalogItem): CatalogType => item.catalogType ?? "503A";
 
 export function getCartCatalogType(items: CatalogItem[]): CatalogType | null {

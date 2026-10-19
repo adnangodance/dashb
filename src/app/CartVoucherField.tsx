@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, ChevronDown, Tag, X } from "lucide-react";
 
 export function CartVoucherField({ patientName, appliedCode, discount, itemCount = 1, onApply, onRemove }: {
@@ -72,28 +72,38 @@ export function CartVoucherField({ patientName, appliedCode, discount, itemCount
   );
 }
 
-export function OrderTotalVouchers({ patients, onChange }: {
+export function OrderTotalVouchers({ patients, onChange, afterApply }: {
   patients: { key: string; name: string; code: string | null; discount: number }[];
   onChange: (key: string, code: string | null) => void;
+  afterApply?: ReactNode;
 }) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState("");
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [selectedKeys, setSelectedKeys] = useState<Set<string> | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  const selectedPatients = patients.filter(patient => selectedKeys.has(patient.key));
   const normalizedCode = draft.trim().toUpperCase();
+  const selectedPatients = patients.filter(patient => selectedKeys === null || selectedKeys.has(patient.key));
+  const allSelected = selectedPatients.length === patients.length;
   const appliedPatients = patients.filter(patient => patient.code);
+  const sharedCode = patients.length > 0 && patients.every(patient => patient.code === patients[0].code) ? patients[0].code : null;
   const changedPatients = selectedPatients.filter(patient => patient.code !== normalizedCode);
   const canApply = Boolean(normalizedCode && changedPatients.length > 0);
+  const applyLabel = allSelected
+    ? `Apply to all ${patients.length} patients`
+    : selectedPatients.length === 1
+      ? `Apply to ${selectedPatients[0].name}`
+      : selectedPatients.length > 0
+        ? `Apply to ${selectedPatients.length} patients`
+        : "Choose patients to apply";
 
   function togglePatient(key: string) {
     setSelectedKeys(current => {
-      const next = new Set(current);
+      const next = new Set(current ?? patients.map(patient => patient.key));
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      return next;
+      return patients.every(patient => next.has(patient.key)) ? null : next;
     });
   }
 
@@ -102,7 +112,6 @@ export function OrderTotalVouchers({ patients, onChange }: {
     changedPatients.forEach(patient => onChange(patient.key, normalizedCode));
     setAnnouncement(`${normalizedCode} applied to ${selectedPatients.map(patient => patient.name).join(", ")}.`);
     setDraft("");
-    setSelectedKeys(new Set());
     inputRef.current?.focus();
   }
 
@@ -115,49 +124,68 @@ export function OrderTotalVouchers({ patients, onChange }: {
         <ChevronDown size={17} className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       <div id={`${id}-fields`} hidden={!open} className="mt-3 space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="space-y-2">
           <input
             ref={inputRef}
             value={draft}
-            onChange={event => { setDraft(event.target.value); if (!event.target.value.trim()) setSelectedKeys(new Set()); }}
+            onChange={event => setDraft(event.target.value)}
             onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); apply(); } }}
             aria-label="Voucher code in Order Total"
-            aria-describedby={normalizedCode ? `${id}-choose` : undefined}
+            aria-describedby={`${id}-scope`}
             placeholder="Enter voucher code"
             maxLength={40}
             autoComplete="off"
             spellCheck={false}
             className="h-[34px] w-full min-w-0 rounded-[8px] border border-[#d9d9d9] bg-white px-3 text-[12px] uppercase text-[#202020] outline-none placeholder:normal-case placeholder:text-[#999] focus:border-[#555] focus:ring-1 focus:ring-[#555]"
           />
-          <button type="button" onClick={apply} disabled={!canApply} aria-label="Apply voucher in Order Total" className="h-[34px] shrink-0 rounded-full bg-[#171717] px-4 text-[11px] font-medium text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:bg-[#f1f1f1] disabled:text-[#aaa]">Apply</button>
         </div>
+        <div>
+          <p id={`${id}-scope`} className="mb-2 text-[11px] font-medium leading-[16px] text-[#777]">Apply voucher to</p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Choose patients for voucher">
+            <button type="button" onClick={() => setSelectedKeys(null)} aria-pressed={allSelected} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors ${allSelected ? "border-[#171717] bg-[#171717] text-white" : "border-[#e3e3e3] bg-white text-[#666] hover:border-[#aaa] hover:text-[#171717]"}`}>
+              {allSelected && <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" />}
+              All {patients.length} patients
+            </button>
+            {patients.map(patient => {
+              const selected = selectedKeys === null || selectedKeys.has(patient.key);
+              return (
+                <button key={patient.key} type="button" onClick={() => togglePatient(patient.key)} aria-pressed={selected} className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${selected ? "border-[#c9dace] bg-[#f0f8f2] text-[#287343]" : "border-[#e3e3e3] bg-white text-[#666] hover:border-[#aaa] hover:text-[#171717]"}`}>
+                  {selected && <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" />}
+                  <span className="break-words">{patient.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <button type="button" onClick={apply} disabled={!canApply} className="min-h-[36px] w-full rounded-full bg-[#171717] px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:bg-[#f1f1f1] disabled:text-[#aaa]">{applyLabel}</button>
+        {afterApply}
         {normalizedCode && (
           <div>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#777]">
-              <p id={`${id}-choose`} className="font-medium">Apply to one or more patients</p>
-              {selectedPatients.length > 0 && <span aria-live="polite">{selectedPatients.length} selected</span>}
-            </div>
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Choose patients for voucher">
-              {patients.map(patient => (
-                <button key={patient.key} type="button" onClick={() => togglePatient(patient.key)} aria-pressed={selectedKeys.has(patient.key)} className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-[11px] font-medium transition-colors ${selectedKeys.has(patient.key) ? "border-[#171717] bg-[#171717] text-white" : "border-[#e3e3e3] bg-white text-[#666] hover:border-[#aaa] hover:text-[#171717]"}`}>
-                  {selectedKeys.has(patient.key) && <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" />}
-                  {patient.name}
-                </button>
-              ))}
-            </div>
             {changedPatients.filter(patient => patient.code).map(patient => <p key={patient.key} className="mt-2 break-words text-[11px] leading-[16px] text-[#858585]">Replaces {patient.code} for {patient.name}.</p>)}
-            {selectedPatients.length > 0 && changedPatients.length === 0 && <p className="mt-2 text-[11px] leading-[16px] text-[#858585]">This code is already applied to {selectedPatients.length === 1 ? selectedPatients[0].name : "these patients"}.</p>}
+            {selectedPatients.length > 0 && changedPatients.length === 0 && <p className="mt-2 text-[11px] leading-[16px] text-[#858585]">This code is already applied to {allSelected ? `all ${patients.length} patients` : selectedPatients.map(patient => patient.name).join(", ")}.</p>}
           </div>
         )}
-        {appliedPatients.length > 0 && (
+        {sharedCode ? (
+          <div>
+            <div className="rounded-[7px] bg-[#f0f8f2] px-3 py-2 text-[12px] text-[#287343]">
+              <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="shrink-0" /><span className="break-all font-medium">{sharedCode}</span></span>
+              <p className="mt-1 text-[11px]">Applied to all {patients.length} patients</p>
+              <p className="mt-1 text-[10px] leading-[15px]">{patients.map(patient => patient.name).join(", ")}</p>
+            </div>
+            <div className="mt-1.5 flex justify-end gap-4">
+              <button type="button" onClick={() => { setDraft(sharedCode); setSelectedKeys(null); inputRef.current?.focus(); }} className="text-[11px] font-medium text-[#666] hover:text-black hover:underline">Edit</button>
+              <button type="button" aria-label="Remove voucher from all patients" onClick={() => { patients.forEach(patient => onChange(patient.key, null)); setDraft(""); setAnnouncement(`Voucher removed from all ${patients.length} patients.`); inputRef.current?.focus(); }} className="text-[11px] font-medium text-[#777] hover:text-black hover:underline">Remove</button>
+            </div>
+          </div>
+        ) : appliedPatients.length > 0 && (
           <div className="flex flex-wrap gap-2" aria-label="Applied patient vouchers">
             {appliedPatients.map(patient => (
               <div key={patient.key} className="inline-flex max-w-full items-center rounded-full bg-[#f0f8f2] text-[#287343]">
-                <button type="button" aria-label={`Edit voucher for ${patient.name} in Order Total`} onClick={() => { setDraft(patient.code ?? ""); setSelectedKeys(new Set([patient.key])); inputRef.current?.focus(); }} className="flex min-w-0 items-center gap-1.5 rounded-l-full py-1.5 pl-2.5 pr-1 text-left text-[10px] hover:underline">
+                <button type="button" aria-label={`Edit voucher for ${patient.name}`} onClick={() => { setDraft(patient.code ?? ""); setSelectedKeys(new Set([patient.key])); inputRef.current?.focus(); }} className="flex min-w-0 items-center gap-1.5 rounded-l-full py-1.5 pl-2.5 pr-1 text-left text-[10px] hover:underline">
                   <CheckCircle2 size={12} className="shrink-0" />
                   <span className="break-words">{patient.name} · <span className="break-all font-medium">{patient.code}</span></span>
                 </button>
-                <button type="button" aria-label={`Remove voucher for ${patient.name} in Order Total`} onClick={() => { onChange(patient.key, null); if (selectedKeys.has(patient.key)) { if (selectedPatients.length === 1) setDraft(""); setSelectedKeys(current => { const next = new Set(current); next.delete(patient.key); return next; }); } setAnnouncement(`Voucher removed from ${patient.name}.`); inputRef.current?.focus(); }} className="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-[#e0f0e5]"><X size={12} /></button>
+                <button type="button" aria-label={`Remove voucher for ${patient.name} in Order Total`} onClick={() => { onChange(patient.key, null); setAnnouncement(`Voucher removed from ${patient.name}.`); inputRef.current?.focus(); }} className="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-[#e0f0e5]"><X size={12} /></button>
               </div>
             ))}
           </div>

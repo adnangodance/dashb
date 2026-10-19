@@ -5,6 +5,7 @@ import { SidebarAlerts, type SidebarAlert } from "./SidebarAlerts";
 import { StateLicenseDrawer, StateLicenseNotice, StateLicenseUpload, useStateLicenseDocument, type StateLicenseController } from "./StateLicenseDocument";
 import { CartConflictModal } from "./CartConflictModal";
 import { CartVoucherField, OrderTotalVouchers } from "./CartVoucherField";
+import { ShippingPaymentNotice } from "./ShippingPaymentNotice";
 import { PatientEpcsStatus, PatientEpcsNotice, type EpcsStatus } from "./PatientEpcsStatus";
 import { DoseSpotStatusIndicator } from "./DoseSpotStatusIndicator";
 import { type DoseSpotSyncData } from "./dosespot-status";
@@ -12,7 +13,7 @@ import { getPatientVoucherSummaries, getVoucherDiscount, patientVoucherKey } fro
 import { ErrorPage, type ErrorPageKind } from "./ErrorPage";
 import { SalesCatalogAccessPage } from "./SalesCatalogAccessPage";
 import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
-import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType, type CartConflict } from "./cart-rules";
+import { addCartProduct, getCartCatalogType, getCartConflict, getShippingChargeCount, type CatalogType, type CartConflict } from "./cart-rules";
 import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import USAMap from "react-usa-map";
@@ -9302,21 +9303,6 @@ const DEFAULT_CART_DATA = {
   ),
 };
 
-// Shipping capability is configured per pharmacy. Pharmacies without multi-patient
-// shipping create one shipment (and one shipping charge) for each patient.
-const PHARMACY_MULTI_PATIENT_SHIPPING: Record<string, boolean> = {
-  "1st Choice Compounding Pharmacy": true,
-  "Optimal Balance Pharmacy": true,
-  "DCA Pharmacy": false,
-  "Thesis Pharmacy": true,
-  "Rush Pharmacy TX": false,
-  "Spring Creek Pharmacy": false,
-};
-
-function supportsMultiPatientShipping(pharmacy: string) {
-  return PHARMACY_MULTI_PATIENT_SHIPPING[pharmacy] ?? false;
-}
-
 type MultiCartItem = {
   id: number;
   name: string;
@@ -9464,14 +9450,14 @@ function MultiPatientCartPage({
   }, [extraVariants]);
 
   const pharmacyNames = [...new Set(cartData.patients.flatMap(patient =>
-    patient.items.filter(item => item.kind !== "supply").map(item => item.pharmacy ?? cartData.pharmacy)
+    patient.items.filter(item => item.kind !== "supply" && !removed.has(item.id)).map(item => item.pharmacy ?? cartData.pharmacy)
   ))];
   const shipping = pharmacyNames.reduce((sum, pharmacy) => {
     const shippingIndex = selectedShippingByPharmacy[pharmacy] ?? 0;
     const patientCount = new Set(cartData.patients
       .filter(patient => patient.items.some(item => item.kind !== "supply" && !removed.has(item.id) && (item.pharmacy ?? cartData.pharmacy) === pharmacy))
-      .map(patient => patient.name)).size;
-    const shipmentCount = supportsMultiPatientShipping(pharmacy) ? 1 : Math.max(1, patientCount);
+      .map(patient => patient.id)).size;
+    const shipmentCount = getShippingChargeCount(patientCount, paymentMethod);
     return sum + cartData.shipping[shippingIndex].price * shipmentCount;
   }, 0);
   const subtotal = cartData.patients.flatMap(p => p.items)
@@ -9748,8 +9734,6 @@ function MultiPatientCartPage({
               const pharmacy = item.pharmacy ?? cartData.pharmacy;
               const isFirstInPharmacy = rowIndex === 0 || (cartRowsWithNumbers[rowIndex - 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
               const isLastInPharmacy = rowIndex === cartRowsWithNumbers.length - 1 || (cartRowsWithNumbers[rowIndex + 1].item.pharmacy ?? cartData.pharmacy) !== pharmacy;
-              const patientVoucher = patientVouchers.find(voucher => voucher.patientId === patient.id);
-              const isFirstForPatient = cartRowsWithNumbers.findIndex(row => row.patient.id === patient.id) === rowIndex;
               const includedSupplies = patient.items.filter(supply => supply.kind === "supply" && !removed.has(supply.id));
               const isExpanded = !is503BCartItem(item) && expandedPrescriptionIds.has(item.id);
               const showBoomCompletedCard = cartCardVariant === 3 && addedPrescriptionIds.has(item.id) && !isExpanded;
@@ -9760,9 +9744,8 @@ function MultiPatientCartPage({
               const isCompactCompleted = isAdnanStyleVariant && addedPrescriptionIds.has(item.id) && !isExpanded;
               const details = prescriptionDetails[item.id];
               const selectedShipping = selectedShippingByPharmacy[pharmacy] ?? 0;
-              const pharmacyPatientCount = new Set(cartRowsWithNumbers.filter(row => (row.item.pharmacy ?? cartData.pharmacy) === pharmacy).map(row => row.patient.name)).size;
-              const multiPatientShipping = supportsMultiPatientShipping(pharmacy);
-              const shipmentCount = multiPatientShipping ? 1 : Math.max(1, pharmacyPatientCount);
+              const pharmacyPatientCount = new Set(cartRowsWithNumbers.filter(row => (row.item.pharmacy ?? cartData.pharmacy) === pharmacy).map(row => row.patient.id)).size;
+              const shipmentCount = getShippingChargeCount(pharmacyPatientCount, paymentMethod);
               const pharmacyShippingTotal = cartData.shipping[selectedShipping].price * shipmentCount;
               const isActivePharmacy = hasFocusedOpenForm && cartRowsWithNumbers.some(row => (row.item.pharmacy ?? cartData.pharmacy) === pharmacy && expandedPrescriptionIds.has(row.item.id) && !addedPrescriptionIds.has(row.item.id));
 
@@ -10366,25 +10349,17 @@ function MultiPatientCartPage({
                       )}
                     </div>
                     )}
-                    {isMultiPatientVoucher && patientVoucher && isFirstForPatient && !is503BCartItem(item) && (
-                      <div className="mt-4 border-t border-[#efefef] pt-4 sm:ml-16">
-                        <CartVoucherField
-                          patientName={patient.name}
-                          appliedCode={patientVoucher.code}
-                          discount={patientVoucher.discount}
-                          itemCount={patient.items.filter(patientItem => !removed.has(patientItem.id) && patientItem.kind !== "supply").length}
-                          onApply={code => updateVoucher(patientVoucher.key, code)}
-                          onRemove={() => updateVoucher(patientVoucher.key, null)}
-                        />
-                      </div>
-                    )}
                   </article>
 
                   {isLastInPharmacy && !is503BCartItem(item) && (
                     <div style={{ backgroundColor: activeCardTheme.shell, borderColor: activeCardTheme.border }} className={`rounded-b-[10px] px-5 transition-opacity ${hasFocusedOpenForm ? "opacity-55 hover:opacity-85" : ""} ${cartCardVariant === 3 ? "border-x border-b pb-4 pt-2" : cartCardVariant === 4 ? "pb-5 pt-1" : "pb-5 pt-2"}`}>
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="max-w-[620px] text-[10px] font-medium leading-[16px] text-[#303030]">
-                          {multiPatientShipping ? "Multi-patient shipping is supported — one shipping fee covers all patients." : "Multi-patient shipping is not supported — shipping is charged separately for each patient (" + shipmentCount + " shipping fees)."}
+                          {pharmacyPatientCount > 1
+                            ? paymentMethod === "patient"
+                              ? `Pay by Patient: ${shipmentCount} separate shipping charges, one per patient.`
+                              : `Pay by Clinic: one shipping charge covers all ${pharmacyPatientCount} patients from this pharmacy.`
+                            : "One shipping charge for this patient."}
                         </p>
                       </div>
                     </div>
@@ -10398,7 +10373,7 @@ function MultiPatientCartPage({
             <h2 className="text-[24px] font-normal text-[#171717]">Order Total</h2>
 
             {isMultiPatientVoucher ? (
-              <OrderTotalVouchers patients={patientVouchers} onChange={updateVoucher} />
+              <OrderTotalVouchers patients={patientVouchers} onChange={updateVoucher} afterApply={<ShippingPaymentNotice paymentMethod={paymentMethod} patientCount={patientVouchers.length} onSwitchToClinic={() => setPaymentMethod("clinic")} />} />
             ) : (
               <div className="mt-5">
                 <CartVoucherField key={sharedVoucherKey} appliedCode={appliedVoucher} discount={voucherDiscount} onApply={code => updateVoucher(sharedVoucherKey, code)} onRemove={() => updateVoucher(sharedVoucherKey, null)} />
@@ -10413,7 +10388,13 @@ function MultiPatientCartPage({
               <div className="flex justify-between gap-4 border-y border-[#ececec] py-4 text-[13px] font-semibold"><span>Total</span><span>{"$" + total.toFixed(2)}</span></div>
             </div>
 
-            <p className="mt-4 text-[11px] leading-[18px] text-[#4f4f4f]">Shipping fees are calculated by pharmacy and patient based on the selected method.</p>
+            {!isMultiPatientVoucher && <div className="mt-4">
+              {patientVouchers.length > 1 ? (
+                <ShippingPaymentNotice paymentMethod={paymentMethod} patientCount={patientVouchers.length} onSwitchToClinic={() => setPaymentMethod("clinic")} />
+              ) : (
+                <p className="text-[11px] leading-[18px] text-[#4f4f4f]">Shipping fees are calculated per pharmacy based on the selected shipping method.</p>
+              )}
+            </div>}
 
             <button onClick={handleCheckout} className="mt-5 h-[46px] w-full rounded-full bg-[#111] text-[12px] font-medium text-white transition-opacity hover:opacity-90">
               Checkout
@@ -10529,6 +10510,9 @@ function MultiPatientCartPage({
             </section>
 
             <section className={`py-5 ${reviewVariant === "v2" ? "border-b border-dashed border-[#cfcfcf]" : "border-b border-[#e8e8e8]"}`}>
+              {!previewSubmitted && patientVouchers.length > 1 && (
+                <div className="mb-4"><ShippingPaymentNotice paymentMethod={paymentMethod} patientCount={patientVouchers.length} onSwitchToClinic={() => setPaymentMethod("clinic")} /></div>
+              )}
               {previewSubmitted && (
                 <div>
                   <div className="px-1 py-1">

@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addCartProduct, getCartCatalogType, getCartConflict, type CatalogType } from "../src/app/cart-rules.ts";
+import { addCartProduct, getCartCatalogType, getCartConflict, getShippingChargeCount, type CatalogType } from "../src/app/cart-rules.ts";
+
+test("multi-patient shipping is charged per patient or once to the clinic", () => {
+  for (const patientCount of [2, 3]) {
+    assert.equal(getShippingChargeCount(patientCount, "patient") * 35, patientCount * 35);
+    assert.equal(getShippingChargeCount(patientCount, "clinic") * 35, 35);
+  }
+});
+
+test("single-patient and empty pharmacies have no extra shipping charges", () => {
+  for (const paymentMethod of ["patient", "clinic"] as const) {
+    assert.equal(getShippingChargeCount(1, paymentMethod), 1);
+    assert.equal(getShippingChargeCount(0, paymentMethod), 0);
+  }
+});
 
 for (const catalogType of ["503A", "503B"] as CatalogType[]) {
   const oppositeType: CatalogType = catalogType === "503A" ? "503B" : "503A";
