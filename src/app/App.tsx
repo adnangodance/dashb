@@ -1,3 +1,6 @@
+import { MobilePageHeader, MobileHeaderAction } from "./MobilePageHeader";
+import { inputMetadata } from "./form-input";
+import { CompactBottomSheet, ModalLayer, ScrollableTabs, motionBehavior, useDashboardTabBar, useMediaQuery, useModalFocus } from "./responsive-ui";
 import { LandingPage } from "./landing/LandingPage";
 import { EnrollmentModal } from "./EnrollmentModal";
 import { DEMO_EPCS_ACCOUNT, EpcsSyncNotice, needsEpcsSyncNotice, type EpcsAccount, type EpcsProfile } from "./EpcsSyncNotice";
@@ -12,9 +15,12 @@ import { type DoseSpotSyncData } from "./dosespot-status";
 import { getPatientVoucherSummaries, getVoucherDiscount, patientVoucherKey } from "./cart-vouchers";
 import { ErrorPage, type ErrorPageKind } from "./ErrorPage";
 import { SalesCatalogAccessPage } from "./SalesCatalogAccessPage";
+import { SalesLanding } from "./landing/SalesLanding";
+import { SignaturePad } from "./SignaturePad";
+import { W9OnboardingPage } from "./W9OnboardingPage";
 import { AppToast, type ToastMessage, type ToastType } from "./AppToast";
 import { addCartProduct, getCartCatalogType, getCartConflict, getShippingChargeCount, type CatalogType, type CartConflict } from "./cart-rules";
-import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type Dispatch, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
+import { Fragment, createContext, useContext, useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, type CSSProperties, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import USAMap from "react-usa-map";
 import {
@@ -28,6 +34,7 @@ import {
   Settings,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Heart,
   Bell,
   ChevronDown,
@@ -487,7 +494,9 @@ function NavItem({
       onMouseLeave={() => onHover(null)}
     >
       <div
-        className={`group flex h-10 w-full cursor-pointer select-none items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-normal text-[#242424] transition-colors ${
+        role="button" tabIndex={0} aria-current={isActive ? "page" : undefined}
+        onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onNavigate(page); onOpenMenu(null); } }}
+        className={`group flex min-h-11 w-full cursor-pointer select-none items-center gap-2.5 rounded-[9px] px-2.5 text-[13px] font-normal text-[#242424] transition-colors ${
           isActive ? "bg-[#F2F3F4] text-[#171717]" : "hover:bg-[#F6F6F5]"
         }`}
         onClick={() => {
@@ -590,7 +599,7 @@ function Sidebar({
   }, [mainMenu]);
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[248px] flex-shrink-0 flex-col bg-[#FCFBFA] px-3">
+    <aside className="dashboard-sidebar sticky top-0 flex h-dvh w-[248px] max-w-full flex-shrink-0 flex-col bg-[#FCFBFA] px-3">
       {/* Logo */}
       <button
         type="button"
@@ -598,7 +607,7 @@ function Sidebar({
         className="flex min-w-0 cursor-pointer items-center gap-2.5 py-4 text-left"
         aria-label="Go to catalog"
       >
-        <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[25px] w-8 object-contain" />
+        <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[25px] w-8 object-contain" />
         <span className="min-w-0 flex-1 truncate font-['Poppins',sans-serif] text-[16px] font-semibold uppercase tracking-wide text-[#1a1a1a]">
           S<span className="lowercase">CRIPTLINKrx</span>
         </span>
@@ -616,7 +625,7 @@ function Sidebar({
             <Plus size={15} strokeWidth={1.9} />
           </span>
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#1a1a1a]">New Order</span>
-          <span className="flex shrink-0 items-center gap-0.5 text-[#9a9e9c]"><kbd className="flex size-5 items-center justify-center rounded-[4px] bg-[#F1F2F3] text-[10px]">⌘</kbd><kbd className="flex size-5 items-center justify-center rounded-[4px] bg-[#F1F2F3] text-[10px]">K</kbd></span>
+          <span className="search-shortcut flex shrink-0 items-center gap-0.5 text-[#9a9e9c]"><kbd className="flex size-5 items-center justify-center rounded-[4px] bg-[#F1F2F3] text-[10px]">⌘</kbd><kbd className="flex size-5 items-center justify-center rounded-[4px] bg-[#F1F2F3] text-[10px]">K</kbd></span>
         </button>
       </div>
 
@@ -654,12 +663,14 @@ function Sidebar({
   );
 }
 
-function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsProfileSave, onEpcsSynced }: {
+function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsProfileSave, onEpcsSynced, mobile = false, onAlertCountChange }: {
   onNavigate: (p: Page) => void;
   epcsAccount: EpcsAccount;
   stateLicense: StateLicenseController;
   onEpcsProfileSave: (profile: EpcsProfile) => void;
   onEpcsSynced: () => void;
+  mobile?: boolean;
+  onAlertCountChange?: (count: number) => void;
 }) {
   const paymentNoticeActive = () => Number(window.sessionStorage.getItem("clinic-card-notice-until") ?? 0) > Date.now();
   const accounts = [
@@ -745,6 +756,8 @@ function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsPr
     });
   }
 
+  useEffect(() => { onAlertCountChange?.(alerts.length); }, [alerts.length, onAlertCountChange]);
+
   return (
     <div className="shrink-0 border-y border-[#ECEEEA] py-4">
       <div className="mb-3 flex items-center gap-2 px-1 text-[#8c948f]">
@@ -754,7 +767,7 @@ function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsPr
         {supportContacts.map((contact) => (
           <div key={contact.name} className="grid grid-cols-[34px_minmax(0,1fr)] items-center gap-2 rounded-[9px] px-1.5 py-1.5 transition-colors hover:bg-[var(--app-menu-bg)]">
             <div className="size-8 overflow-hidden rounded-full bg-[#F1F2F2]">
-              <img src={contact.avatar} alt="" className="size-full object-cover" />
+              <img decoding="async" loading="lazy" src={contact.avatar} alt="" className="size-full object-cover" />
             </div>
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
@@ -802,7 +815,9 @@ function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsPr
           </div>
         )}
       </div>
-      <SidebarAlerts alerts={alerts} paused={accountMenuOpen || epcsDrawerOpen || licenseDrawerOpen} priorityAlertId={clinicPaymentUpdated ? "payment" : stateLicense.record?.skippedAt && !stateLicense.record.document ? "state-license" : undefined} />
+      {mobile ? <section aria-label="Account alerts" className="mt-4 space-y-3">
+        {alerts.map(alert => <div key={alert.id}>{alert.content}</div>)}
+      </section> : <SidebarAlerts alerts={alerts} paused={accountMenuOpen || epcsDrawerOpen || licenseDrawerOpen} priorityAlertId={clinicPaymentUpdated ? "payment" : stateLicense.record?.skippedAt && !stateLicense.record.document ? "state-license" : undefined} />}
       {licenseDrawerOpen && <StateLicenseDrawer license={stateLicense} onClose={() => {
         setLicenseDrawerOpen(false);
         window.requestAnimationFrame(() => {
@@ -812,6 +827,94 @@ function SidebarSupportVersion({ onNavigate, epcsAccount, stateLicense, onEpcsPr
       }} />}
     </div>
   );
+}
+
+const MOBILE_MORE_ITEMS: MenuItem[] = [
+  ...INITIAL_MAIN.filter(item => !["catalog-503a", "orders", "cart-multi", "users"].includes(item.page)),
+  { icon: Settings, label: "Settings", page: "settings" },
+];
+
+function MobileBadge({ count, dot = false }: { count: number; dot?: boolean }) {
+  if (count <= 0) return null;
+  return <span aria-hidden="true" className={dot ? "dashboard-tab-dot" : "dashboard-tab-badge"}>{dot ? null : count > 99 ? "99+" : count}</span>;
+}
+
+function DashboardMobileNavigation({ active, cartPage, onNavigate, onLogout, epcsAccount, stateLicense, onEpcsProfileSave, onEpcsSynced }: {
+  active: Page; cartPage: Page; onNavigate: (page: Page) => void; onLogout: () => void;
+  epcsAccount: EpcsAccount; stateLicense: StateLicenseController;
+  onEpcsProfileSave: (profile: EpcsProfile) => void; onEpcsSynced: () => void;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
+  const panel = useRef<HTMLElement>(null);
+  const swipeStart = useRef<number | null>(null);
+  const { cartItemCount } = useCartSummary();
+  useDashboardTabBar();
+  useModalFocus(panel, moreOpen, () => setMoreOpen(false));
+  useEffect(() => { setMoreOpen(false); }, [active]);
+  useEffect(() => {
+    const close = () => setMoreOpen(false);
+    window.addEventListener("hashchange", close);
+    return () => window.removeEventListener("hashchange", close);
+  }, []);
+  const navigate = (next: Page) => { setMoreOpen(false); onNavigate(next); };
+  const accountName = `${epcsAccount.profile.firstName} ${epcsAccount.profile.lastName}${epcsAccount.profile.credentials ? `, ${epcsAccount.profile.credentials}` : ""}`;
+  const tabs = [
+    { icon: FlaskConical, label: "Catalog", page: "catalog-503a" as Page, active: ["products", "catalog-503a", "product-detail", "favorites", "pharmacies"].includes(active), count: 0 },
+    { icon: ClipboardList, label: "Orders", page: "orders" as Page, active: ["orders", "order-detail"].includes(active), count: ORDERS.length },
+    { icon: ShoppingCart, label: "Cart", page: cartPage, active: ["cart-single", "cart-multi", "checkout-prescription"].includes(active), count: cartItemCount },
+    { icon: Users, label: "Patients", page: "users" as Page, active: active === "users", count: 0 },
+  ];
+  const moreActive = MOBILE_MORE_ITEMS.some(item => item.page === active) || ["not-found", "something-went-wrong"].includes(active);
+  return <>
+    <nav className="dashboard-tabbar" aria-label="Dashboard navigation">
+      {tabs.map(({ icon: Icon, label, page, active: selected, count }) => <button key={label} type="button" className="dashboard-tab" aria-current={selected ? "page" : undefined} aria-label={count > 0 ? `${label}, ${count} ${label === "Cart" ? "items" : "orders"}` : label} onClick={() => navigate(page)}>
+        <span className="dashboard-tab-icon"><Icon size={22} strokeWidth={1.75} aria-hidden="true" /><MobileBadge count={count} /></span>
+        <span>{label}</span>
+      </button>)}
+      <button type="button" className="dashboard-tab" aria-current={moreActive ? "page" : undefined} aria-label={alertCount ? `More, ${alertCount} account alerts` : "More"} aria-haspopup="dialog" aria-expanded={moreOpen} aria-controls="dashboard-more" onClick={() => setMoreOpen(true)}>
+        <span className="dashboard-tab-icon"><MoreHorizontal size={22} strokeWidth={1.75} aria-hidden="true" /><MobileBadge count={alertCount} dot /></span>
+        <span>More</span>
+      </button>
+    </nav>
+    <div className="dashboard-more-layer" hidden={!moreOpen}>
+      <button type="button" tabIndex={-1} className="dashboard-more-backdrop" aria-label="Close More" onClick={() => setMoreOpen(false)} />
+      <section ref={panel} id="dashboard-more" className="dashboard-more-sheet" role="dialog" aria-modal={moreOpen ? true : undefined} aria-labelledby="dashboard-more-title" tabIndex={-1}>
+        <header className="dashboard-more-header" onPointerDown={event => {
+          if ((event.target as HTMLElement).closest("button")) return;
+          swipeStart.current = event.clientY;
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }} onPointerUp={event => {
+          if (swipeStart.current !== null && event.clientY - swipeStart.current > 65) setMoreOpen(false);
+          swipeStart.current = null;
+        }} onPointerCancel={() => { swipeStart.current = null; }}>
+          <span className="dashboard-more-grabber" aria-hidden="true" />
+          <div className="flex items-center justify-between px-5 pb-2">
+            <h2 id="dashboard-more-title" className="text-[20px] font-semibold" tabIndex={-1} data-initial-focus>More</h2>
+            <button type="button" aria-label="Close More" onClick={() => setMoreOpen(false)} className="flex size-11 items-center justify-center rounded-full bg-black/5"><X size={19} /></button>
+          </div>
+        </header>
+        <div className="dashboard-more-content">
+          <div className="dashboard-more-group">
+            <button type="button" className="dashboard-more-row" onClick={() => navigate("products")}><Plus size={20} aria-hidden="true" /><span>New Order</span><ChevronRight size={16} aria-hidden="true" /></button>
+            {MOBILE_MORE_ITEMS.map(({ icon: Icon, label, page }) => <button key={page} type="button" className="dashboard-more-row" aria-current={page === active ? "page" : undefined} onClick={() => navigate(page)}>
+              <Icon size={20} strokeWidth={1.7} aria-hidden="true" /><span>{label}</span><ChevronRight size={16} aria-hidden="true" />
+            </button>)}
+          </div>
+          <SidebarSupportVersion mobile onAlertCountChange={setAlertCount} onNavigate={navigate} epcsAccount={epcsAccount} stateLicense={stateLicense} onEpcsProfileSave={onEpcsProfileSave} onEpcsSynced={onEpcsSynced} />
+          <div className="py-4">
+            <div className="mb-3 flex items-center gap-3 px-2"><span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#eeeeee] text-[14px] font-semibold" aria-hidden="true">{epcsAccount.profile.firstName.charAt(0)}</span><div className="min-w-0"><p className="text-[13px] font-medium">{accountName}</p><p className="text-[11px] text-[#667085]">User Verified</p></div></div>
+            <DoseSpotStatusIndicator data={{ epcsStatus: epcsAccount.doseSpotSyncRequired ? "needs_sync" : "synced" }} name={accountName} kind="prescriber" />
+            <div className="dashboard-more-group mt-2">
+              <button type="button" className="dashboard-more-row" onClick={() => navigate("settings")}><User size={20} aria-hidden="true" /><span>Account settings</span><ChevronRight size={16} aria-hidden="true" /></button>
+              <button type="button" className="dashboard-more-row" onClick={() => { setMoreOpen(false); window.location.reload(); }}><RefreshCw size={20} aria-hidden="true" /><span>Hard Refresh</span><ChevronRight size={16} aria-hidden="true" /></button>
+              <button type="button" className="dashboard-more-row" onClick={() => { setMoreOpen(false); onLogout(); }}><LogOut size={20} aria-hidden="true" /><span>Log out</span><ChevronRight size={16} aria-hidden="true" /></button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </>;
 }
 
 // ─── Header ──────────────────────────────────────────────────────────────────
@@ -864,7 +967,7 @@ function UserChip({
       onMouseLeave={scheduleMenuClose}
     >
       {menuOpen && (
-        <div className="account-menu absolute bottom-[calc(100%+8px)] left-0 z-40 w-[224px] rounded-[14px] border border-[#dedede] bg-white p-2 shadow-[0_10px_28px_rgba(16,24,40,0.12)] after:absolute after:-bottom-2 after:left-0 after:h-2 after:w-full after:content-['']">
+        <div className="account-menu absolute bottom-[calc(100%+8px)] left-0 z-40 w-[224px] max-w-[calc(100vw-32px)] rounded-[14px] border border-[#dedede] bg-white p-2 shadow-[0_10px_28px_rgba(16,24,40,0.12)] after:absolute after:-bottom-2 after:left-0 after:h-2 after:w-full after:content-['']">
           <button onClick={() => { onNavigate("settings"); setMenuPinned(false); setMenuHovered(false); }} className="group flex h-10 w-full items-center gap-3 rounded-[9px] px-3 text-left text-[12px] font-normal text-black transition-colors hover:bg-[#f1f1f1]"><Settings size={16} strokeWidth={1.6} className="text-black transition-transform duration-200 ease-out group-hover:-translate-y-px group-hover:translate-x-0.5 group-hover:rotate-6" /> Settings</button>
           <button onClick={() => window.location.reload()} className="group flex h-10 w-full items-center gap-3 rounded-[9px] px-3 text-left text-[12px] font-normal text-black transition-colors hover:bg-[#f1f1f1]"><RefreshCw size={16} strokeWidth={1.6} className="text-black transition-transform duration-200 ease-out group-hover:-translate-y-px group-hover:translate-x-0.5 group-hover:rotate-6" /> Hard Refresh</button>
           <button onClick={onLogout} className="group flex h-10 w-full items-center gap-3 rounded-[9px] px-3 text-left text-[12px] font-normal text-black transition-colors hover:bg-[#f1f1f1]"><LogOut size={16} strokeWidth={1.6} className="text-black transition-transform duration-200 ease-out group-hover:-translate-y-px group-hover:translate-x-0.5 group-hover:rotate-6" /> Log out</button>
@@ -878,7 +981,7 @@ function UserChip({
               <span className="truncate text-[12px] font-normal text-[#181a19]">Hi, Zee Rabushaj, NP</span>
             </span>
             <span className="mt-1 flex items-center gap-1.5">
-              <img src={userVerifiedIcon} alt="Verified" className="size-[14px] shrink-0" />
+              <img decoding="async" loading="lazy" src={userVerifiedIcon} alt="Verified" className="size-[14px] shrink-0" />
               <span className="shrink-0 rounded-[7px] bg-[var(--app-menu-bg)] px-2 py-0.5 text-[10px] font-normal text-[#5f6662]">User Verified</span>
             </span>
           </span>
@@ -894,6 +997,9 @@ function UserChip({
 
 function Header({
   title,
+  mobileSubtitle,
+  mobileActions,
+  mobileSearch,
   breadcrumb,
   onNavigate,
   favoriteProducts = [],
@@ -901,6 +1007,9 @@ function Header({
   onProductSelect,
 }: {
   title: string;
+  mobileSubtitle?: ReactNode;
+  mobileActions?: ReactNode;
+  mobileSearch?: { value?: string; onChange?: (value: string) => void; placeholder: string };
   breadcrumb?: string[];
   onNavigate: (p: Page) => void;
   favoriteProducts?: CardDef[];
@@ -908,7 +1017,9 @@ function Header({
   onProductSelect?: (product: CardDef) => void;
 }) {
   return (
-    <div className="flex items-start justify-between mb-6">
+    <>
+    <MobilePageHeader title={title} subtitle={mobileSubtitle} actions={mobileActions} search={mobileSearch} />
+    <div className="hidden lg:flex items-start justify-between mb-6">
       <div>
         <h1 className="text-[28px] font-semibold text-[#1a1a1a] leading-tight">{title}</h1>
         {breadcrumb && (
@@ -929,6 +1040,7 @@ function Header({
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -1008,6 +1120,7 @@ const US_LICENSE_STATES = [
 ] as const;
 
 function PharmacyComplianceModal({ pharmacy, onClose }: { pharmacy: PharmacyLogo; onClose: () => void }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
   const [selectedState, setSelectedState] = useState("NE");
   const [licensePopoverPosition, setLicensePopoverPosition] = useState({ left: 72, top: 46 });
   const pharmacyGradient = "radial-gradient(circle at 8% 12%, rgba(255,255,255,.96), transparent 34%), linear-gradient(135deg, #f6f9fc 0%, #dce5ef 55%, #bdcadd 100%)";
@@ -1061,11 +1174,12 @@ function PharmacyComplianceModal({ pharmacy, onClose }: { pharmacy: PharmacyLogo
     return () => window.cancelAnimationFrame(frame);
   }, [selectedState]);
   return createPortal(
-    <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="pharmacy-compliance-title" onClick={event => event.stopPropagation()} onMouseDown={onClose}>
+    <ModalLayer onClose={onClose} className="fixed inset-0 z-[180] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]" labelledBy="pharmacy-compliance-title">
       <div className="max-h-[92vh] w-full max-w-[760px] overflow-y-auto rounded-[16px] bg-white shadow-[0_30px_90px_rgba(0,0,0,0.25)]" onClick={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-[#ececec] px-6 py-5">
+        <MobilePageHeader title="Licensing & compliance" onBack={onClose} titleId="pharmacy-compliance-title" className="mobile-sheet-header" />
+        <div className="max-lg:hidden flex items-start justify-between gap-4 border-b border-[#ececec] px-6 py-5">
           <div>
-            <h2 id="pharmacy-compliance-title" className="text-[22px] font-medium tracking-[-0.02em] text-[#171717]">Licensing &amp; compliance</h2>
+            <h2 id={compactNavigation ? undefined : "pharmacy-compliance-title"} className="text-[22px] font-medium tracking-[-0.02em] text-[#171717]">Licensing &amp; compliance</h2>
           </div>
           <button type="button" onClick={onClose} className="flex size-8 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close"><X size={19} /></button>
         </div>
@@ -1073,7 +1187,7 @@ function PharmacyComplianceModal({ pharmacy, onClose }: { pharmacy: PharmacyLogo
         <div className="p-6">
           <div className="relative overflow-hidden rounded-[14px] p-5 shadow-[0_14px_34px_rgba(50,75,120,0.13)]" style={{ backgroundImage: pharmacyGradient }}>
             <div className="relative z-10 flex flex-wrap items-center gap-4">
-              <img src={pharmacy.src} alt="" className="size-14 rounded-full border-2 border-white object-cover shadow-[0_7px_18px_rgba(30,64,175,0.18)]" />
+              <img decoding="async" loading="lazy" src={pharmacy.src} alt="" className="size-14 rounded-full border-2 border-white object-cover shadow-[0_7px_18px_rgba(30,64,175,0.18)]" />
               <div className="min-w-0 flex-1">
                 <h3 className="text-[16px] font-medium text-[#1b1b1b]">{pharmacy.name}</h3>
                 <p className="mt-1 text-[11px] text-[#61708a]">Pharmacy · NPI 1235136987</p>
@@ -1085,6 +1199,11 @@ function PharmacyComplianceModal({ pharmacy, onClose }: { pharmacy: PharmacyLogo
 
           <div className="mt-6">
             <div className="flex items-end justify-between gap-4"><div><h3 className="text-[15px] font-medium text-[#202020]">Nationwide licensing</h3><p className="mt-1 text-[11px] text-[#777]">Select a state on the map to view license details.</p></div><div className="flex items-center gap-5 text-[12px] font-medium text-[#666]"><span className="flex items-center gap-2"><i className="size-3 rounded-full bg-[#8797ad]" />Licensed</span><span className="flex items-center gap-2"><i className="size-3 rounded-full bg-[#e5e9ef]" />Not licensed</span></div></div>
+            <label className="mt-4 block text-[13px] font-medium text-[#42506a]">Select a state
+              <select value={selectedState} onChange={event => setSelectedState(event.target.value)} className="mt-2 min-h-11 w-full rounded-lg border border-[#d6dce3] bg-white px-3 text-base">
+                {[...US_LICENSE_STATES].sort((a, b) => a[1].localeCompare(b[1])).map(([code, name]) => <option value={code} key={code}>{name}{unavailableStates.has(code) ? " — Not licensed" : " — Licensed"}</option>)}
+              </select>
+            </label>
             <div className="mt-4 overflow-hidden rounded-[12px] border border-[#e6e8e7] bg-[#fafafa] px-5 py-4">
               <style>{`.pharmacy-usa-map svg{display:block;width:100%;height:auto}.pharmacy-usa-map .state{stroke:#fff;stroke-width:.65;vector-effect:non-scaling-stroke;transition:fill .18s ease,opacity .18s ease,filter .18s ease}.pharmacy-usa-map .state:hover{cursor:pointer;opacity:.82;filter:drop-shadow(0 2px 3px rgba(0,0,0,.16))}.pharmacy-usa-map .state-initial{font-family:Inter,sans-serif;letter-spacing:-.02em}@keyframes license-pop{0%{opacity:0;transform:translate(-50%,-45%) scale(.94)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}`}</style>
               <div className="pharmacy-usa-map relative mx-auto max-w-[650px]" aria-label="United States pharmacy license coverage map">
@@ -1101,17 +1220,17 @@ function PharmacyComplianceModal({ pharmacy, onClose }: { pharmacy: PharmacyLogo
                 />
                 <div
                   key={selectedState}
-                  className="absolute z-20 w-[250px] rounded-[12px] border border-white/80 bg-white/95 p-3 shadow-[0_14px_36px_rgba(18,18,18,0.16)] backdrop-blur-md animate-[license-pop_.24s_ease-out]"
-                  style={{ left: `${licensePopoverPosition.left}%`, top: `${licensePopoverPosition.top}%`, transform: "translate(-50%, -50%)" }}
+                  className="pharmacy-license-card absolute z-20 w-[250px] max-w-[calc(100vw-32px)] rounded-[12px] border border-white/80 bg-white/95 p-3 shadow-[0_14px_36px_rgba(18,18,18,0.16)] backdrop-blur-md animate-[license-pop_.24s_ease-out]"
+                  style={{ "--license-left": `${licensePopoverPosition.left}%`, "--license-top": `${licensePopoverPosition.top}%` } as CSSProperties}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[8px] font-medium uppercase tracking-[0.08em] text-[#6f83a5]">Selected license</p>
                       <h3 className="mt-1 text-[14px] font-medium text-[#17233a]">{selectedStateName} <span className="text-[#71819b]">({selectedState})</span></h3>
                     </div>
-                    <button type="button" className="h-8 shrink-0 rounded-full bg-[#121212] px-3 text-[10px] font-medium text-white shadow-[0_6px_18px_rgba(0,0,0,0.16)] transition-all hover:-translate-y-0.5 hover:bg-black">View PDF</button>
+                    <button type="button" disabled={unavailableStates.has(selectedState)} className="h-8 shrink-0 rounded-full bg-[#121212] disabled:opacity-40 px-3 text-[10px] font-medium text-white shadow-[0_6px_18px_rgba(0,0,0,0.16)] transition-all hover:-translate-y-0.5 hover:bg-black">View PDF</button>
                   </div>
-                  <p className="mt-1.5 text-[10px] text-[#65758f]">State board license · Active and verified</p>
+                  <p className="mt-1.5 text-[10px] text-[#65758f]">{unavailableStates.has(selectedState) ? "Not licensed in this state" : "State board license · Active and verified"}</p>
                   <a href={stateBoardLicenseUrl} target="_blank" rel="noreferrer" className="mt-2 block truncate text-[9px] font-medium text-[#2563eb] underline decoration-[#94b3f5] underline-offset-2 hover:text-[#174bb8]">{stateBoardLicenseUrl}</a>
                 </div>
               </div>
@@ -1119,12 +1238,14 @@ function PharmacyComplianceModal({ pharmacy, onClose }: { pharmacy: PharmacyLogo
           </div>
         </div>
       </div>
-    </div>,
+    </ModalLayer>,
     document.body,
   );
 }
 
 function ReferenceProductCard({ card, onClick }: { card: CardDef; onClick: () => void }) {
+  const { favoriteProductIds, setFavoriteProductIds } = useProductFavorites();
+  const favorited = favoriteProductIds.has(card.id);
   const [pharmaciesExpanded, setPharmaciesExpanded] = useState(false);
   const [compliancePharmacy, setCompliancePharmacy] = useState<PharmacyLogo | null>(null);
   const pharmacyCollapseTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -1152,30 +1273,43 @@ function ReferenceProductCard({ card, onClick }: { card: CardDef; onClick: () =>
     if (pharmacyCollapseTimer.current) window.clearTimeout(pharmacyCollapseTimer.current);
   }, []);
   return (
-    <article onClick={onClick} className="group relative h-[393px] w-[268px] shrink-0 cursor-pointer overflow-hidden rounded-[4px] bg-gradient-to-b from-[rgba(247,239,233,0.1)] to-[rgba(236,229,182,0.1)] transition-transform duration-200 hover:-translate-y-0.5">
-      <div className="absolute left-[18px] top-[18px] z-10 flex flex-col items-start gap-2">
+    <article tabIndex={0} aria-label={`View ${card.name}`} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onClick(); } }} onClick={onClick} className="catalog-card group relative h-[393px] w-full sm:w-[268px] shrink-0 cursor-pointer overflow-hidden rounded-[16px] bg-gradient-to-b from-[rgba(247,239,233,0.1)] to-[rgba(236,229,182,0.1)] transition-transform duration-200 hover:-translate-y-0.5">
+      <div className="catalog-card-badges absolute left-[18px] top-[18px] z-10 flex flex-col items-start gap-2">
         {(card.dosage === "Injection" || card.dosage === "Lyophilized") && (
           <span className="flex size-8 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2563EB] shadow-[0_4px_14px_rgba(37,99,235,0.10)]" title="Refrigerated" aria-label="Refrigerated">
             <Snowflake size={15} strokeWidth={2} />
           </span>
         )}
       </div>
-      <div className="flex h-[285px] items-center justify-center px-7 pt-5">
+      <button type="button" className="catalog-card-favorite absolute right-0 top-0 z-10 flex size-11 items-center justify-center rounded-full text-[#111] lg:hidden"
+        aria-label={`${favorited ? "Remove" : "Add"} ${card.name} ${favorited ? "from" : "to"} favorites`} aria-pressed={favorited}
+        onClick={event => {
+          event.stopPropagation();
+          setFavoriteProductIds(previous => {
+            const next = new Set(previous);
+            next.has(card.id) ? next.delete(card.id) : next.add(card.id);
+            return next;
+          });
+        }}><Heart size={20} strokeWidth={1.75} className={favorited ? "fill-current" : ""} aria-hidden="true" /></button>
+      <div className="catalog-card-art flex h-[285px] items-center justify-center px-7 pt-5">
         {card.img === blankVialReference || card.img === blankLyophilizedVialReference ? (
-          <div className="h-[245px] w-[184px] transition-transform duration-300 group-hover:scale-[1.02]"><ManualVialPreview name={card.name} strength={card.strength ?? "2.5 mg/mL"} size="Multi-Dose Vial" palette={card.vialPalette} baseImage={card.img} compact flatLabel /></div>
+          <div className="h-[245px] w-[184px] max-w-full transition-transform duration-300 group-hover:scale-[1.02]"><ManualVialPreview name={card.name} strength={card.strength ?? "2.5 mg/mL"} size="Multi-Dose Vial" palette={card.vialPalette} baseImage={card.img} compact flatLabel /></div>
         ) : card.img === blankNasalSprayReference ? (
-          <div className="h-[245px] w-[190px] transition-transform duration-300 group-hover:scale-[1.02]"><ManualNasalSprayPreview name={card.name} strength={card.strength ?? "100mg/mL"} palette={card.vialPalette} compact flatLabel /></div>
+          <div className="h-[245px] w-[190px] max-w-full transition-transform duration-300 group-hover:scale-[1.02]"><ManualNasalSprayPreview name={card.name} strength={card.strength ?? "100mg/mL"} palette={card.vialPalette} compact flatLabel /></div>
         ) : card.img === blankTopicalDropperReference ? (
-          <div className="h-[235px] w-[180px] transition-transform duration-300 group-hover:scale-[1.02]"><ManualNasalSprayPreview name={card.name} strength={card.strength ?? "2%"} palette={card.vialPalette} baseImage={card.img} variant="topical" compact flatLabel /></div>
+          <div className="h-[235px] w-[180px] max-w-full transition-transform duration-300 group-hover:scale-[1.02]"><ManualNasalSprayPreview name={card.name} strength={card.strength ?? "2%"} palette={card.vialPalette} baseImage={card.img} variant="topical" compact flatLabel /></div>
         ) : card.img === blankPatchPackageReference ? (
           <div className="size-[220px] transition-transform duration-300 group-hover:scale-[1.02]"><ManualPatchPreview name={card.name} strength={card.strength ?? "0.1mg/day"} compact /></div>
         ) : card.img === blankCapsuleBottleReference ? (
-          <div className="h-[250px] w-[195px] transition-transform duration-300 group-hover:scale-[1.02]"><ManualCapsulePreview name={card.name} strength={card.strength ?? "200mg/mL"} palette={card.vialPalette} compact flatLabel /></div>
+          <div className="h-[250px] w-[195px] max-w-full transition-transform duration-300 group-hover:scale-[1.02]"><ManualCapsulePreview name={card.name} strength={card.strength ?? "200mg/mL"} palette={card.vialPalette} compact flatLabel /></div>
         ) : (
-          <img src={card.img} alt={card.name} className="max-h-[245px] max-w-[195px] object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.02]" />
+          <img decoding="async" loading="lazy" src={card.img} alt={card.name} className="max-h-[245px] max-w-[195px] object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.02]" />
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 px-[18px] pb-[18px]">
+      <div className="catalog-card-body absolute inset-x-0 bottom-0 px-[18px] pb-[18px]">
+        <div className="catalog-card-avatars mb-2 flex items-center lg:hidden" aria-label={`${card.pharmacies} pharmacies`}>
+          {visibleLogos.map(pharmacy => <img key={pharmacy.name} decoding="async" loading="lazy" src={pharmacy.src} alt={pharmacy.name} className="size-6 rounded-full border-2 border-white bg-white object-cover" />)}
+        </div>
         <div
           role="button"
           tabIndex={0}
@@ -1197,7 +1331,7 @@ function ReferenceProductCard({ card, onClick }: { card: CardDef; onClick: () =>
               else expandPharmacies();
             }
           }}
-          className={`mb-2 flex h-8 w-fit items-center rounded-full border border-white/80 bg-white/80 px-1.5 shadow-[0_5px_16px_rgba(0,0,0,0.08)] backdrop-blur-sm transition-all duration-300 hover:bg-white ${pharmaciesExpanded ? "gap-1.5" : "gap-0"}`}
+          className={`max-lg:hidden mb-2 flex h-8 w-fit items-center rounded-full border border-white/80 bg-white/80 px-1.5 shadow-[0_5px_16px_rgba(0,0,0,0.08)] backdrop-blur-sm transition-all duration-300 hover:bg-white ${pharmaciesExpanded ? "gap-1.5" : "gap-0"}`}
         >
           {visibleLogos.map((pharmacy, index) => (
             <button
@@ -1216,14 +1350,15 @@ function ReferenceProductCard({ card, onClick }: { card: CardDef; onClick: () =>
               className={`relative flex size-6 items-center justify-center rounded-full border-2 border-white bg-white shadow-[0_1px_4px_rgba(0,0,0,0.14)] transition-all duration-300 ${!pharmaciesExpanded && index > 0 ? "-ml-2" : "ml-0"}`}
               style={{ transitionDelay: `${index * 28}ms` }}
             >
-              <img src={pharmacy.src} alt={pharmacy.name} className="size-full rounded-full object-cover" />
+              <img decoding="async" loading="lazy" src={pharmacy.src} alt={pharmacy.name} className="size-full rounded-full object-cover" />
             </button>
           ))}
         </div>
         <h3 className="break-words text-[14px] font-semibold leading-[18px] text-[#111]">{card.name}</h3>
-        <p className="mt-0.5 text-[12px] leading-[16px] text-[#666]">{card.price}</p>
-        <p className="flex items-center gap-1.5 text-[11px] leading-[15px] text-[#888]">
-          <span>{displaySize}</span>
+        <p className="catalog-card-price mt-0.5 text-[12px] leading-[16px] text-[#666]">{card.price}</p>
+        <p className="catalog-card-meta flex items-center gap-1.5 text-[11px] leading-[15px] text-[#888]">
+          <span className="max-lg:hidden">{displaySize}</span>
+          <span className="lg:hidden">{card.strength ?? "Strength unavailable"}</span>
           <span aria-hidden="true" className="text-[#bbb]">·</span>
           <span>{card.dosage}</span>
         </p>
@@ -1291,7 +1426,7 @@ function FigmaCard({
       className="relative inline-grid shrink-0 cursor-pointer grid-cols-[max-content] grid-rows-[max-content] place-items-start"
       onClick={onClick}
     >
-      <div className="col-1 row-1 h-[393px] w-[268px] rounded-[16px] bg-gradient-to-b from-[rgba(247,239,233,0.1)] to-[rgba(236,229,182,0.1)]" />
+      <div className="col-1 row-1 h-[393px] w-[268px] max-w-full rounded-[16px] bg-gradient-to-b from-[rgba(247,239,233,0.1)] to-[rgba(236,229,182,0.1)]" />
 
       <div className="pointer-events-none col-1 row-1" style={productImageStyle}>
         {usesManualVial ? (
@@ -1305,7 +1440,7 @@ function FigmaCard({
         ) : img === blankCapsuleBottleReference ? (
           <ManualCapsulePreview name={name} strength={strength ?? "200mg/mL"} palette={vialPalette} compact />
         ) : (
-          <img
+          <img decoding="async" loading="lazy"
             alt={name}
             className={`size-full max-w-none ${imgContain ? "object-contain" : "object-cover"}`}
             src={img}
@@ -1331,7 +1466,7 @@ function FigmaCard({
             {pharmacies > 2 ? `+${pharmacies - 2} Pharmacies` : `${pharmacies} Pharmacies`}
             {pharmacyMenuOpen && (
               <span
-                className="absolute bottom-[26px] left-0 z-30 w-[155px] overflow-hidden rounded-[8px] border border-[#e5e5e5] bg-white text-left shadow-[0_7px_18px_rgba(0,0,0,0.10)]"
+                className="absolute bottom-[26px] left-0 z-30 w-[155px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[8px] border border-[#e5e5e5] bg-white text-left shadow-[0_7px_18px_rgba(0,0,0,0.10)]"
                 onClick={(event) => event.stopPropagation()}
               >
                 <span className="block space-y-1 px-3 py-2.5">
@@ -1401,19 +1536,19 @@ function OldCatalogCard({
   return (
     <article
       onClick={onClick}
-      className="relative h-[374px] w-[268px] shrink-0 cursor-pointer overflow-hidden rounded-[16px] bg-gradient-to-b from-[rgba(247,239,233,0.10)] to-[rgba(236,229,182,0.10)] transition-transform duration-200 hover:-translate-y-0.5"
+      className="relative h-[374px] w-[268px] max-w-full shrink-0 cursor-pointer overflow-hidden rounded-[16px] bg-gradient-to-b from-[rgba(247,239,233,0.10)] to-[rgba(236,229,182,0.10)] transition-transform duration-200 hover:-translate-y-0.5"
     >
       <div className="flex h-[276px] items-center justify-center px-7 pt-5">
         {img === blankVialReference || img === blankLyophilizedVialReference ? (
-          <div className="h-[245px] w-[196px]">
+          <div className="h-[245px] w-[196px] max-w-full">
             <ManualVialPreview name={name} strength={strength ?? "20mg/25mg/mL"} size="1 (5mL) Vial" palette={vialPalette} baseImage={img} compact flatLabel />
           </div>
         ) : img === blankNasalSprayReference ? (
-          <div className="h-[260px] w-[223px]">
+          <div className="h-[260px] w-[223px] max-w-full">
             <ManualNasalSprayPreview name={name} strength={strength ?? "100mg/mL"} palette={vialPalette} compact flatLabel />
           </div>
         ) : img === blankTopicalDropperReference ? (
-          <div className="h-[245px] w-[196px]">
+          <div className="h-[245px] w-[196px] max-w-full">
             <ManualNasalSprayPreview name={name} strength={strength ?? "2%"} palette={vialPalette} baseImage={img} variant="topical" compact flatLabel />
           </div>
         ) : img === blankPatchPackageReference ? (
@@ -1421,11 +1556,11 @@ function OldCatalogCard({
             <ManualPatchPreview name={name} strength={strength ?? "0.1mg/day"} compact />
           </div>
         ) : img === blankCapsuleBottleReference ? (
-          <div className="h-[255px] w-[205px]">
+          <div className="h-[255px] w-[205px] max-w-full">
             <ManualCapsulePreview name={name} strength={strength ?? "200mg/mL"} palette={vialPalette} compact flatLabel />
           </div>
         ) : (
-          <img src={img} alt={name} className="max-h-[245px] max-w-[205px] object-contain mix-blend-multiply" />
+          <img decoding="async" loading="lazy" src={img} alt={name} className="max-h-[245px] max-w-[205px] object-contain mix-blend-multiply" />
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 px-6 pb-6">
@@ -1476,18 +1611,18 @@ function PharmacyCatalogCard({
   onClick: () => void;
 }) {
   return (
-    <article onClick={onClick} className="group relative flex h-[374px] w-[268px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-[16px] border border-[#e7e9e7] bg-white transition-colors hover:border-[#cbd2ce]">
+    <article onClick={onClick} className="group relative flex h-[374px] w-[268px] max-w-full shrink-0 cursor-pointer flex-col overflow-hidden rounded-[16px] border border-[#e7e9e7] bg-white transition-colors hover:border-[#cbd2ce]">
       <div className="relative flex h-[230px] items-center justify-center bg-[#f7f8f7] px-7 py-5">
         {img === blankVialReference || img === blankLyophilizedVialReference ? (
-          <div className="h-[195px] w-[156px] transition-transform duration-300 group-hover:scale-[1.03]">
+          <div className="h-[195px] w-[156px] max-w-full transition-transform duration-300 group-hover:scale-[1.03]">
             <ManualVialPreview name={name} strength={strength ?? "20mg/25mg/mL"} size="1 (5mL) Vial" palette={vialPalette} baseImage={img} compact />
           </div>
         ) : img === blankNasalSprayReference ? (
-          <div className="h-[205px] w-[176px] transition-transform duration-300 group-hover:scale-[1.03]">
+          <div className="h-[205px] w-[176px] max-w-full transition-transform duration-300 group-hover:scale-[1.03]">
             <ManualNasalSprayPreview name={name} strength={strength ?? "100mg/mL"} palette={vialPalette} compact />
           </div>
         ) : img === blankTopicalDropperReference ? (
-          <div className="h-[195px] w-[156px] transition-transform duration-300 group-hover:scale-[1.03]">
+          <div className="h-[195px] w-[156px] max-w-full transition-transform duration-300 group-hover:scale-[1.03]">
             <ManualNasalSprayPreview name={name} strength={strength ?? "2%"} palette={vialPalette} baseImage={img} variant="topical" compact />
           </div>
         ) : img === blankPatchPackageReference ? (
@@ -1495,11 +1630,11 @@ function PharmacyCatalogCard({
             <ManualPatchPreview name={name} strength={strength ?? "0.1mg/day"} compact />
           </div>
         ) : img === blankCapsuleBottleReference ? (
-          <div className="h-[205px] w-[165px] transition-transform duration-300 group-hover:scale-[1.03]">
+          <div className="h-[205px] w-[165px] max-w-full transition-transform duration-300 group-hover:scale-[1.03]">
             <ManualCapsulePreview name={name} strength={strength ?? "200mg/mL"} palette={vialPalette} compact />
           </div>
         ) : (
-          <img src={img} alt={name} className="max-h-[195px] max-w-[175px] object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03]" />
+          <img decoding="async" loading="lazy" src={img} alt={name} className="max-h-[195px] max-w-[175px] object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03]" />
         )}
         {heartVariant !== "none" && (
           <button type="button" onClick={(event) => { event.stopPropagation(); onFavorite(); }} className="absolute right-3.5 top-3.5 flex size-8 items-center justify-center rounded-full border border-[#e5e8e6] bg-white text-[#1c211e]" aria-label={favorited ? "Remove from favorites" : "Add to favorites"}>
@@ -1776,11 +1911,11 @@ function MultiPatientPanel({ activePharmacy, onSelect }: { activePharmacy: strin
       <p className="text-[10px] font-semibold text-[#9d9d9d] tracking-widest uppercase mb-2.5">
         Pharmacies ({PHARMACIES_MULTI.length - 1})
       </p>
-      <div className="flex flex-wrap gap-2">
+      <ScrollableTabs className="flex gap-2" activeKey={activePharmacy} desktopLayout="wrap" aria-label="Pharmacies">
         {PHARMACIES_MULTI.map((ph) => {
           const isActive = activePharmacy === ph.name;
           return (
-            <button
+            <button data-active={isActive}
               key={ph.name}
               onClick={() => onSelect(ph.name)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[12px] font-medium transition-all ${
@@ -1790,13 +1925,13 @@ function MultiPatientPanel({ activePharmacy, onSelect }: { activePharmacy: strin
               }`}
             >
               {ph.name}
-              <span className={`text-[11px] font-semibold ${isActive ? "text-[#183229]" : "text-[#9d9d9d]"}`}>
+              <span className={`scrollable-tab-count text-[11px] font-semibold ${isActive ? "text-[#183229]" : "text-[#9d9d9d]"}`}>
                 {ph.count}
               </span>
             </button>
           );
         })}
-      </div>
+      </ScrollableTabs>
     </div>
   );
 }
@@ -1838,10 +1973,10 @@ function FavoritesPage({
 
   return (
     <>
-      <Header title="Favorites" onNavigate={onNavigate} cartPage={cartPage} onProductSelect={onProductSelect} />
+      <Header title="Favorites" onNavigate={onNavigate} cartPage={cartPage} onProductSelect={onProductSelect} mobileActions={<MobileHeaderAction aria-label="Clear all favorites" onClick={() => setFavoriteProductIds(new Set())}><Trash2 size={20} /></MobileHeaderAction>} />
 
       <section>
-        <div className="flex justify-end pb-3">
+        <div className="hidden lg:flex justify-end pb-3">
           <button
             onClick={() => setFavoriteProductIds(new Set())}
             className="inline-flex h-9 items-center gap-2 rounded-[7px] px-3 text-[12px] font-semibold uppercase tracking-[0.02em] text-[#183229] transition-colors hover:bg-[#f6f4f5]"
@@ -1853,7 +1988,7 @@ function FavoritesPage({
         {favoriteProducts.length > 0 ? (
           <div className="flex flex-wrap gap-5">
             {favoriteProducts.map(product => (
-              <article key={product.id} className="relative w-[268px]">
+              <article key={product.id} className="relative w-[268px] max-w-full overflow-hidden">
                 <FigmaCard
                   name={product.name}
                   strength={product.strength}
@@ -1918,13 +2053,13 @@ function FavoritesPage({
 function CatalogProductSkeleton({ index }: { index: number }) {
   return (
     <div
-      className="h-[393px] w-[268px] overflow-hidden rounded-[4px] bg-gradient-to-b from-[#fbfbfb] to-[#f7f7f5]"
+      className="catalog-card h-[393px] w-full sm:w-[268px] overflow-hidden rounded-[16px] bg-gradient-to-b from-[#fbfbfb] to-[#f7f7f5]"
       aria-hidden="true"
       style={{ animationDelay: `${index * 55}ms` }}
     >
       <div className="relative flex h-[285px] items-center justify-center">
         <div className="absolute left-[18px] top-[18px] size-8 animate-pulse rounded-full bg-[#e9edf3]" />
-        <div className="h-[205px] w-[118px] animate-pulse rounded-[54px_54px_22px_22px] bg-gradient-to-r from-[#ececec] via-[#f7f7f7] to-[#ececec] bg-[length:200%_100%]" />
+        <div className="h-[205px] w-[118px] max-w-full animate-pulse rounded-[54px_54px_22px_22px] bg-gradient-to-r from-[#ececec] via-[#f7f7f7] to-[#ececec] bg-[length:200%_100%]" />
       </div>
       <div className="px-[18px] pt-2">
         <div className="mb-3 h-6 w-full animate-pulse rounded-full bg-[#eeeeec]" />
@@ -1943,6 +2078,7 @@ function ProductsPage({
   onProductSelect,
   oldCatalog,
   pharmacyCatalog,
+  catalogType = "503A",
 }: {
   onNavigate: (p: Page) => void;
   cartMode: CartMode;
@@ -1950,8 +2086,12 @@ function ProductsPage({
   onProductSelect: (product: CardDef) => void;
   oldCatalog: boolean;
   pharmacyCatalog: boolean;
+  catalogType?: CatalogType;
 }) {
   const { favoriteProductIds, setFavoriteProductIds, favoriteProducts } = useProductFavorites();
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
+  const [mobileSheet, setMobileSheet] = useState<"filters" | "pharmacies" | null>(null);
+  useEffect(() => { if (!compactNavigation) setMobileSheet(null); }, [compactNavigation]);
   const [search, setSearch] = useState("");
   const [activePharmacy, setActivePharmacy] = useState("All Pharmacies");
   const [shippingStates, setShippingStates] = useState<string[]>([]);
@@ -1982,7 +2122,7 @@ function ProductsPage({
   }, []);
 
   useEffect(() => {
-    if (!openCatalogFilter) return;
+    if (!openCatalogFilter || compactNavigation) return;
 
     function closeFilterOnOutsideClick(event: MouseEvent | TouchEvent) {
       if (!catalogFiltersRef.current?.contains(event.target as Node)) {
@@ -1996,7 +2136,7 @@ function ProductsPage({
       document.removeEventListener("mousedown", closeFilterOnOutsideClick);
       document.removeEventListener("touchstart", closeFilterOnOutsideClick);
     };
-  }, [openCatalogFilter]);
+  }, [openCatalogFilter, compactNavigation]);
 
   function toggleFav(id: number) {
     const willFavorite = !favoriteProductIds.has(id);
@@ -2064,16 +2204,9 @@ function ProductsPage({
   };
 
   return (
-    <>
+    <div className="catalog-page">
       {/* Page header — matches Figma layout */}
-      <div className="mb-0 flex h-[38px] items-center justify-between">
-        <h1 className="flex h-[38px] items-center font-['Inter',sans-serif] text-[28px] font-semibold leading-tight text-[#1a1a1a]">Products</h1>
-      </div>
-
-      {/* Search + filters bar */}
-      <div className="sticky top-0 z-30 -mx-2 mb-5 flex items-end gap-[14px] border-b border-[#eeeeec] bg-white/95 px-2 pb-4 pt-3 backdrop-blur-sm">
-        {/* Search box — from Figma import Group1216401138 */}
-        <div className="group w-[220px] flex-shrink-0 transition-all duration-300 ease-out focus-within:w-[310px]">
+      <MobilePageHeader title={catalogType === "503B" ? "503B Catalog" : "Catalog"} searchRow={<div className="mobile-page-custom-search catalog-search group w-full min-w-0 lg:w-[220px] lg:shrink-0 transition-all duration-300 ease-out lg:focus-within:w-[310px]">
         <div className="flex h-[38px] items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:border-2 focus-within:border-black">
           {/* Magnifier icon — pce98200 */}
           <svg width="14" height="14" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 transition-transform duration-300 group-focus-within:scale-110">
@@ -2084,10 +2217,45 @@ function ProductsPage({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search stock or Orders"
+            aria-label="Search products"
+            placeholder={compactNavigation ? "Search products" : "Search stock or Orders"}
             className="flex-1 text-[11px] font-medium font-['Inter',sans-serif] text-black bg-transparent outline-none placeholder:text-[#686868] placeholder:font-medium"
           />
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="search-shortcut flex items-center gap-1 flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
+              <path d="M11.25 9H10V7H11.25C11.695 7 12.13 6.86804 12.5 6.62081C12.87 6.37357 13.1584 6.02217 13.3287 5.61104C13.499 5.19991 13.5436 4.74751 13.4568 4.31105C13.37 3.87459 13.1557 3.47368 12.841 3.15901C12.5263 2.84434 12.1254 2.63005 11.689 2.54323C11.2525 2.45642 10.8001 2.50097 10.389 2.67127C9.97783 2.84157 9.62643 3.12996 9.3792 3.49997C9.13196 3.86998 9 4.30499 9 4.75V6H7V4.75C7 4.30499 6.86804 3.86998 6.62081 3.49997C6.37357 3.12996 6.02217 2.84157 5.61104 2.67127C5.19991 2.50097 4.74751 2.45642 4.31105 2.54323C3.87459 2.63005 3.47368 2.84434 3.15901 3.15901C2.84434 3.47368 2.63005 3.87459 2.54323 4.31105C2.45642 4.74751 2.50097 5.19991 2.67127 5.61104C2.84157 6.02217 3.12996 6.37357 3.49997 6.62081C3.86998 6.86804 4.30499 7 4.75 7H6V9H4.75C4.30499 9 3.86998 9.13196 3.49997 9.3792C3.12996 9.62643 2.84157 9.97783 2.67127 10.389C2.50097 10.8001 2.45642 11.2525 2.54323 11.689C2.63005 12.1254 2.84434 12.5263 3.15901 12.841C3.47368 13.1557 3.87459 13.37 4.31105 13.4568C4.74751 13.5436 5.19991 13.499 5.61104 13.3287C6.02217 13.1584 6.37357 12.87 6.62081 12.5C6.86804 12.13 7 11.695 7 11.25V10H9V11.25C9 11.695 9.13196 12.13 9.3792 12.5C9.62643 12.87 9.97783 13.1584 10.389 13.3287C10.8001 13.499 11.2525 13.5436 11.689 13.4568C12.1254 13.37 12.5263 13.1557 12.841 12.841C13.1557 12.5263 13.37 12.1254 13.4568 11.689C13.5436 11.2525 13.499 10.8001 13.3287 10.389C13.1584 9.97783 12.87 9.62643 12.5 9.3792C12.13 9.13196 11.695 9 11.25 9ZM10 4.75C10 4.50277 10.0733 4.2611 10.2107 4.05554C10.348 3.84998 10.5432 3.68976 10.7716 3.59515C11.0001 3.50054 11.2514 3.47579 11.4939 3.52402C11.7363 3.57225 11.9591 3.6913 12.1339 3.86612C12.3087 4.04093 12.4278 4.26366 12.476 4.50614C12.5242 4.74861 12.4995 4.99995 12.4049 5.22836C12.3102 5.45676 12.15 5.65199 11.9445 5.78934C11.7389 5.92669 11.4972 6 11.25 6H10V4.75ZM3.5 4.75C3.5 4.41848 3.6317 4.10054 3.86612 3.86612C4.10054 3.6317 4.41848 3.5 4.75 3.5C5.08152 3.5 5.39946 3.6317 5.63388 3.86612C5.86831 4.10054 6 4.41848 6 4.75V6H4.75C4.41848 6 4.10054 5.86831 3.86612 5.63388C3.6317 5.39946 3.5 5.08152 3.5 4.75ZM6 11.25C6 11.4972 5.92669 11.7389 5.78934 11.9445C5.65199 12.15 5.45676 12.3102 5.22836 12.4049C4.99995 12.4995 4.74861 12.5242 4.50614 12.476C4.26366 12.4278 4.04093 12.3087 3.86612 12.1339C3.6913 11.9591 3.57225 11.7363 3.52402 11.4939C3.47579 11.2514 3.50054 11.0001 3.59515 10.7716C3.68976 10.5432 3.84998 10.348 4.05554 10.2107C4.2611 10.0733 4.50277 10 4.75 10H6V11.25ZM7 7H9V9H7V7ZM11.25 12.5C10.9185 12.5 10.6005 12.3683 10.3661 12.1339C10.1317 11.8995 10 11.5815 10 11.25V10H11.25C11.5815 10 11.8995 10.1317 12.1339 10.3661C12.3683 10.6005 12.5 10.9185 12.5 11.25C12.5 11.5815 12.3683 11.8995 12.1339 12.1339C11.8995 12.3683 11.5815 12.5 11.25 12.5Z" fill="#686868"/>
+            </svg>
+            <span className="text-[12px] text-[#686868] font-['Inter',sans-serif] font-normal">+ F</span>
+          </div>
+        </div>
+        </div>} filterButton={<button type="button" className="mobile-header-action mobile-header-filter" aria-label={selectedCatalogFilterCount ? `Filters, ${selectedCatalogFilterCount} selected` : "Open filters"}
+          aria-haspopup="dialog" aria-controls="catalog-filters-sheet" aria-expanded={mobileSheet === "filters"} onClick={() => { setOpenCatalogFilter(null); setMobileSheet("filters"); }}>
+          <SlidersHorizontal size={21} strokeWidth={1.75} aria-hidden="true" />
+          {selectedCatalogFilterCount > 0 && <span className="catalog-filter-dot" />}
+        </button>} />
+      <div className="max-lg:hidden mb-0 flex h-[38px] items-center justify-between">
+        <h1 className="flex h-[38px] items-center font-['Inter',sans-serif] text-[28px] font-semibold leading-tight text-[#1a1a1a]"><span className="lg:hidden">Catalog</span><span className="max-lg:hidden">Products</span></h1>
+      </div>
+
+      {/* Search + filters bar */}
+      <div className="catalog-toolbar max-lg:hidden sticky top-0 z-30 -mx-2 mb-5 flex flex-col items-stretch gap-4 lg:flex-row lg:items-end lg:gap-[14px] border-b border-[#eeeeec] bg-white/95 px-2 pb-4 pt-3 backdrop-blur-sm">
+        {/* Search box — from Figma import Group1216401138 */}
+        <div className="catalog-search group w-full min-w-0 lg:w-[220px] lg:shrink-0 transition-all duration-300 ease-out lg:focus-within:w-[310px]">
+        <div className="flex h-[38px] items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:border-2 focus-within:border-black">
+          {/* Magnifier icon — pce98200 */}
+          <svg width="14" height="14" viewBox="0 0 18 18" fill="none" className="flex-shrink-0 transition-transform duration-300 group-focus-within:scale-110">
+            <path d="M16.1489 15.3529L12.6283 11.8331C13.6487 10.608 14.1575 9.03675 14.0489 7.4461C13.9403 5.85545 13.2227 4.3679 12.0452 3.2929C10.8678 2.21791 9.32127 1.63823 7.72733 1.67445C6.13339 1.71068 4.61477 2.36002 3.4874 3.4874C2.36002 4.61477 1.71068 6.13339 1.67445 7.72733C1.63823 9.32127 2.21791 10.8678 3.2929 12.0452C4.3679 13.2227 5.85545 13.9403 7.4461 14.0489C9.03675 14.1575 10.608 13.6487 11.8331 12.6283L15.3529 16.1489C15.4052 16.2011 15.4672 16.2426 15.5355 16.2709C15.6038 16.2991 15.677 16.3137 15.7509 16.3137C15.8248 16.3137 15.898 16.2991 15.9663 16.2709C16.0346 16.2426 16.0966 16.2011 16.1489 16.1489C16.2011 16.0966 16.2426 16.0346 16.2709 15.9663C16.2991 15.898 16.3137 15.8248 16.3137 15.7509C16.3137 15.677 16.2991 15.6038 16.2709 15.5355C16.2426 15.4672 16.2011 15.4052 16.1489 15.3529ZM2.81339 7.87589C2.81339 6.87462 3.1103 5.89584 3.66658 5.06332C4.22285 4.23079 5.01351 3.58192 5.93856 3.19875C6.86361 2.81558 7.88151 2.71533 8.86354 2.91067C9.84557 3.10601 10.7476 3.58816 11.4556 4.29616C12.1636 5.00417 12.6458 5.90622 12.8411 6.88825C13.0365 7.87028 12.9362 8.88818 12.553 9.81323C12.1699 10.7383 11.521 11.5289 10.6885 12.0852C9.85594 12.6415 8.87716 12.9384 7.87589 12.9384C6.53369 12.9369 5.24689 12.4031 4.29781 11.454C3.34873 10.5049 2.81488 9.21809 2.81339 7.87589Z" fill="#686868"/>
+          </svg>
+          <input
+            ref={compactNavigation ? undefined : searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search products"
+            placeholder={compactNavigation ? "Search products" : "Search stock or Orders"}
+            className="flex-1 text-[11px] font-medium font-['Inter',sans-serif] text-black bg-transparent outline-none placeholder:text-[#686868] placeholder:font-medium"
+          />
+          <div className="search-shortcut flex items-center gap-1 flex-shrink-0">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
               <path d="M11.25 9H10V7H11.25C11.695 7 12.13 6.86804 12.5 6.62081C12.87 6.37357 13.1584 6.02217 13.3287 5.61104C13.499 5.19991 13.5436 4.74751 13.4568 4.31105C13.37 3.87459 13.1557 3.47368 12.841 3.15901C12.5263 2.84434 12.1254 2.63005 11.689 2.54323C11.2525 2.45642 10.8001 2.50097 10.389 2.67127C9.97783 2.84157 9.62643 3.12996 9.3792 3.49997C9.13196 3.86998 9 4.30499 9 4.75V6H7V4.75C7 4.30499 6.86804 3.86998 6.62081 3.49997C6.37357 3.12996 6.02217 2.84157 5.61104 2.67127C5.19991 2.50097 4.74751 2.45642 4.31105 2.54323C3.87459 2.63005 3.47368 2.84434 3.15901 3.15901C2.84434 3.47368 2.63005 3.87459 2.54323 4.31105C2.45642 4.74751 2.50097 5.19991 2.67127 5.61104C2.84157 6.02217 3.12996 6.37357 3.49997 6.62081C3.86998 6.86804 4.30499 7 4.75 7H6V9H4.75C4.30499 9 3.86998 9.13196 3.49997 9.3792C3.12996 9.62643 2.84157 9.97783 2.67127 10.389C2.50097 10.8001 2.45642 11.2525 2.54323 11.689C2.63005 12.1254 2.84434 12.5263 3.15901 12.841C3.47368 13.1557 3.87459 13.37 4.31105 13.4568C4.74751 13.5436 5.19991 13.499 5.61104 13.3287C6.02217 13.1584 6.37357 12.87 6.62081 12.5C6.86804 12.13 7 11.695 7 11.25V10H9V11.25C9 11.695 9.13196 12.13 9.3792 12.5C9.62643 12.87 9.97783 13.1584 10.389 13.3287C10.8001 13.499 11.2525 13.5436 11.689 13.4568C12.1254 13.37 12.5263 13.1557 12.841 12.841C13.1557 12.5263 13.37 12.1254 13.4568 11.689C13.5436 11.2525 13.499 10.8001 13.3287 10.389C13.1584 9.97783 12.87 9.62643 12.5 9.3792C12.13 9.13196 11.695 9 11.25 9ZM10 4.75C10 4.50277 10.0733 4.2611 10.2107 4.05554C10.348 3.84998 10.5432 3.68976 10.7716 3.59515C11.0001 3.50054 11.2514 3.47579 11.4939 3.52402C11.7363 3.57225 11.9591 3.6913 12.1339 3.86612C12.3087 4.04093 12.4278 4.26366 12.476 4.50614C12.5242 4.74861 12.4995 4.99995 12.4049 5.22836C12.3102 5.45676 12.15 5.65199 11.9445 5.78934C11.7389 5.92669 11.4972 6 11.25 6H10V4.75ZM3.5 4.75C3.5 4.41848 3.6317 4.10054 3.86612 3.86612C4.10054 3.6317 4.41848 3.5 4.75 3.5C5.08152 3.5 5.39946 3.6317 5.63388 3.86612C5.86831 4.10054 6 4.41848 6 4.75V6H4.75C4.41848 6 4.10054 5.86831 3.86612 5.63388C3.6317 5.39946 3.5 5.08152 3.5 4.75ZM6 11.25C6 11.4972 5.92669 11.7389 5.78934 11.9445C5.65199 12.15 5.45676 12.3102 5.22836 12.4049C4.99995 12.4995 4.74861 12.5242 4.50614 12.476C4.26366 12.4278 4.04093 12.3087 3.86612 12.1339C3.6913 11.9591 3.57225 11.7363 3.52402 11.4939C3.47579 11.2514 3.50054 11.0001 3.59515 10.7716C3.68976 10.5432 3.84998 10.348 4.05554 10.2107C4.2611 10.0733 4.50277 10 4.75 10H6V11.25ZM7 7H9V9H7V7ZM11.25 12.5C10.9185 12.5 10.6005 12.3683 10.3661 12.1339C10.1317 11.8995 10 11.5815 10 11.25V10H11.25C11.5815 10 11.8995 10.1317 12.1339 10.3661C12.3683 10.6005 12.5 10.9185 12.5 11.25C12.5 11.5815 12.3683 11.8995 12.1339 12.1339C11.8995 12.3683 11.5815 12.5 11.25 12.5Z" fill="#686868"/>
             </svg>
@@ -2096,8 +2264,9 @@ function ProductsPage({
         </div>
         </div>
 
+
         {/* Filters */}
-        <div ref={catalogFiltersRef} className="ml-auto flex items-end gap-3">
+        <div ref={catalogFiltersRef} className="catalog-filters max-lg:hidden grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap lg:ml-auto">
           {catalogFilters.map(({ label, values, setValues, options }) => {
             const isOpen = openCatalogFilter === label;
             const hasSelection = values.length > 0;
@@ -2106,7 +2275,7 @@ function ProductsPage({
             const isAreaOfTreatment = label === "Area of Treatment";
             const isCountCheckboxFilter = isDosage || isAreaOfTreatment;
             const buttonLabel = isShippingState && hasSelection ? values[0] : label;
-            const filterWidthClass = isShippingState ? "w-[142px]" : isAreaOfTreatment ? "w-[165px]" : "w-[94px]";
+            const filterWidthClass = isShippingState ? "w-full sm:w-[142px]" : isAreaOfTreatment ? "w-full sm:w-[165px]" : "w-full sm:w-[94px]";
             return (
               <div key={label} className="relative flex flex-col gap-1.5">
                 <span className="px-0.5 text-[11px] font-medium leading-none text-[#667085]">
@@ -2128,7 +2297,7 @@ function ProductsPage({
 
                 {isOpen && (
                   <div className={`absolute top-[56px] z-20 overflow-hidden rounded-[9px] border border-[#d7dee8] bg-white shadow-[0_18px_40px_rgba(16,24,40,0.16)] ${
-                    isDosage ? "right-0 w-[180px]" : isAreaOfTreatment ? "left-0 w-[220px]" : "left-0 w-[240px]"
+                    isDosage ? "right-0 w-[180px] max-w-full" : isAreaOfTreatment ? "left-0 w-[220px] max-w-full" : "left-0 w-[240px] max-w-full"
                   }`}>
                     <div className="border-b border-[#e7ebf0] p-2">
                       <div className="flex h-[34px] items-center gap-2 rounded-[5px] border border-[#cfd8e3] bg-white px-2">
@@ -2214,7 +2383,7 @@ function ProductsPage({
             <button
               type="button"
               onClick={() => setOpenCatalogFilter(openCatalogFilter === "Legend" ? null : "Legend")}
-              className={`flex h-[38px] w-[108px] items-center justify-between gap-2 rounded-[9px] border bg-white px-3 text-[12px] font-medium leading-none text-[#344054] transition-colors ${openCatalogFilter === "Legend" ? "border-black" : "border-[#cfcfcf] hover:border-[#aeb8c5]"}`}
+              className={`flex h-11 w-full sm:w-[108px] items-center justify-between gap-2 rounded-[9px] border bg-white px-3 text-[12px] font-medium leading-none text-[#344054] transition-colors ${openCatalogFilter === "Legend" ? "border-black" : "border-[#cfcfcf] hover:border-[#aeb8c5]"}`}
               aria-expanded={openCatalogFilter === "Legend"}
             >
               <span className="inline-flex items-center gap-1.5"><Info size={14} strokeWidth={2} /> Legend</span>
@@ -2222,7 +2391,7 @@ function ProductsPage({
             </button>
 
             {openCatalogFilter === "Legend" && (
-              <div className="absolute right-0 top-[56px] z-30 w-[300px] rounded-[10px] border border-[#d7dee8] bg-white p-4 shadow-[0_18px_40px_rgba(16,24,40,0.16)]">
+              <div className="absolute right-0 top-[56px] z-30 w-[300px] max-w-[calc(100vw-32px)] rounded-[10px] border border-[#d7dee8] bg-white p-4 shadow-[0_18px_40px_rgba(16,24,40,0.16)]">
                 <div className="space-y-3.5">
                   <div className="flex items-start gap-3">
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[#2563EB]"><Snowflake size={14} strokeWidth={2} /></span>
@@ -2243,24 +2412,32 @@ function ProductsPage({
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="catalog-pharmacy-row lg:hidden">
+        <div className="catalog-pharmacy-pill" title={activePharmacy}>
+          <span className="truncate">{activePharmacy}</span><span className="shrink-0 font-semibold">{PHARMACIES_MULTI.find(pharmacy => pharmacy.name === activePharmacy)?.count ?? 0}</span>
+        </div>
+        <button type="button" className="catalog-pharmacy-link" aria-haspopup="dialog" aria-controls="catalog-pharmacies-sheet" aria-expanded={mobileSheet === "pharmacies"} onClick={() => setMobileSheet("pharmacies")}>
+          See All Pharmacies <ChevronDown size={14} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      </div>
+      <ScrollableTabs className="catalog-desktop-pharmacies max-lg:hidden mb-5 flex items-center gap-2" activeKey={activePharmacy} desktopLayout="wrap" aria-label="Filter by pharmacy">
         {PHARMACIES_MULTI.map(pharmacy => {
           const isActive = activePharmacy === pharmacy.name;
           return (
-            <button
+            <button data-active={isActive}
               key={pharmacy.name}
               onClick={() => setActivePharmacy(pharmacy.name)}
               className={`flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-medium transition-colors ${isActive ? "border-2 border-[#2563EB] text-[#2563EB]" : "border-[0.5px] border-black text-[#1a1a1a] hover:border-[#2563EB]"}`}
             >
               {pharmacy.name}
-              <span className={`text-[11px] font-semibold ${isActive ? "text-[#2563EB]" : "text-[#9d9d9d]"}`}>{pharmacy.count}</span>
+              <span className={`scrollable-tab-count text-[11px] font-semibold ${isActive ? "text-[#2563EB]" : "text-[#9d9d9d]"}`}>{pharmacy.count}</span>
             </button>
           );
         })}
-      </div>
+      </ScrollableTabs>
 
       {selectedCatalogFilterCount > 0 && (
-        <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2">
+        <ScrollableTabs className="-mt-2 mb-5 flex items-center gap-2" desktopLayout="wrap" aria-label="Selected catalog filters">
           {catalogFilters.flatMap(({ label, values, setValues }) => (
             values.map(value => (
               <button
@@ -2280,7 +2457,7 @@ function ProductsPage({
           >
             Clear all
           </button>
-        </div>
+        </ScrollableTabs>
       )}
 
       {catalogLoading && (
@@ -2289,7 +2466,7 @@ function ProductsPage({
             <span className="size-3.5 animate-spin rounded-full border-2 border-[#d9d9d7] border-t-[#121212]" />
             <h2 className="font-['Inter',sans-serif] text-[18px] font-medium leading-none text-black">Loading products</h2>
           </div>
-          <div className="grid justify-items-start gap-[13px] [grid-template-columns:repeat(auto-fit,268px)]">
+          <div className="catalog-grid grid justify-items-start gap-[13px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),268px))]">
             {Array.from({ length: 8 }, (_, index) => <CatalogProductSkeleton key={index} index={index} />)}
           </div>
         </section>
@@ -2307,7 +2484,7 @@ function ProductsPage({
         return (
           <section className="mb-6">
             <h2 className="font-['Inter',sans-serif] font-medium text-black text-[18px] mb-4 leading-none">Popular Products</h2>
-            <div className="grid justify-items-start gap-[13px] [grid-template-columns:repeat(auto-fit,268px)]">
+            <div className="catalog-grid grid justify-items-start gap-[13px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),268px))]">
               {filtered.map(renderCard)}
             </div>
           </section>
@@ -2331,7 +2508,7 @@ function ProductsPage({
               </span>
             </h2>
             {filtered.length > 0 ? (
-              <div className="grid justify-items-start gap-[13px] [grid-template-columns:repeat(auto-fit,268px)]">
+              <div className="catalog-grid grid justify-items-start gap-[13px] [grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),268px))]">
                 {filtered.map(renderCard)}
               </div>
             ) : (
@@ -2344,7 +2521,49 @@ function ProductsPage({
           </section>
         );
       })()}
-    </>
+      {compactNavigation && mobileSheet === "pharmacies" && <CompactBottomSheet id="catalog-pharmacies-sheet" title="All Pharmacies" onClose={() => setMobileSheet(null)}>
+        <div className="dashboard-more-group catalog-pharmacy-options">
+          {PHARMACIES_MULTI.map(pharmacy => {
+            const logo = PHARMACY_LOGOS.find(logo => logo.name === pharmacy.name);
+            const selected = activePharmacy === pharmacy.name;
+            return <button key={pharmacy.name} type="button" className="catalog-pharmacy-option" aria-pressed={selected} onClick={() => { setActivePharmacy(pharmacy.name); setMobileSheet(null); }}>
+              {logo ? <img src={logo.src} alt="" className="size-9 shrink-0 rounded-full border border-[#eee] bg-white object-cover" /> : <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#eef3ff] text-[#2563eb]"><Building2 size={18} aria-hidden="true" /></span>}
+              <span className="min-w-0 flex-1">{pharmacy.name}</span><span className="text-[13px] text-[#777]">{pharmacy.count}</span>
+              <span className="flex size-5 shrink-0 items-center justify-center">{selected && <Check size={18} className="text-[#2563eb]" aria-label="Selected" />}</span>
+            </button>;
+          })}
+        </div>
+      </CompactBottomSheet>}
+      {compactNavigation && mobileSheet === "filters" && <CompactBottomSheet id="catalog-filters-sheet" title="Filters" onClose={() => setMobileSheet(null)}>
+        <div className="catalog-mobile-filters">
+          {catalogFilters.map(({ label, values, setValues, options }) => <section key={label} className="catalog-mobile-filter-section">
+            <button type="button" className="catalog-mobile-filter-heading" aria-expanded={openCatalogFilter === label} aria-controls={`mobile-filter-${label.replaceAll(" ", "-")}`} onClick={() => setOpenCatalogFilter(openCatalogFilter === label ? null : label)}>
+              <span>{label}{values.length > 0 && <span className="ml-2 text-[#2563eb]">({values.length})</span>}</span><ChevronDown size={18} className={openCatalogFilter === label ? "rotate-180" : ""} aria-hidden="true" />
+            </button>
+            {openCatalogFilter === label && <div id={`mobile-filter-${label.replaceAll(" ", "-")}`} className="pb-3">
+              <label className="catalog-sheet-search"><Search size={18} aria-hidden="true" /><input type="search" aria-label={`Search ${label.toLowerCase()}`} placeholder={`Search ${label.toLowerCase()}`} value={catalogFilterSearch[label] ?? ""} onChange={event => setCatalogFilterSearch(previous => ({ ...previous, [label]: event.target.value }))} /></label>
+              <div className="catalog-mobile-filter-options">
+                {options.filter(option => option.toLowerCase().includes((catalogFilterSearch[label] ?? "").toLowerCase())).map(option => <label key={option} className="catalog-mobile-filter-option">
+                  <input type={label === "Shipping State" ? "radio" : "checkbox"} name={`mobile-${label}`} checked={values.includes(option)} onChange={() => setValues(previous => label === "Shipping State" ? [option] : previous.includes(option) ? previous.filter(value => value !== option) : [...previous, option])} />
+                  <span>{option === "Iv Bag 15" ? "Iv Bag" : option}{label !== "Shipping State" && <span className="ml-1 text-[#888]">({(label === "Dosage" ? dosageCounts : areaCounts)[option] ?? 0})</span>}</span>
+                </label>)}
+                {!options.some(option => option.toLowerCase().includes((catalogFilterSearch[label] ?? "").toLowerCase())) && <p className="py-3 text-[14px] text-[#777]">No results</p>}
+              </div>
+              {values.length > 0 && <button type="button" onClick={() => setValues([])} className="min-h-11 text-[13px] font-medium text-[#2563eb]">Clear {label}</button>}
+            </div>}
+          </section>)}
+          <details className="catalog-mobile-legend">
+            <summary className="min-h-11 cursor-pointer py-3 text-[14px] font-medium">Legend</summary>
+            <div className="space-y-3 pb-2 text-[12px] text-[#777]">
+              <p className="flex items-start gap-2"><Snowflake size={16} className="shrink-0 text-[#2563eb]" /><span><strong className="font-medium text-[#333]">Refrigerated:</strong> Requires cold storage and ships refrigerated.</span></p>
+              <p className="flex items-start gap-2"><span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-[#fff0f0] text-[10px] font-semibold text-[#d84b4b]">C</span><span><strong className="font-medium text-[#333]">Controlled:</strong> Additional prescribing requirements apply.</span></p>
+              <p className="flex items-start gap-2"><Heart size={16} className="shrink-0 text-[#111]" /><span><strong className="font-medium text-[#333]">Favorite:</strong> Products you save appear in Favorites.</span></p>
+            </div>
+          </details>
+        </div>
+        <div className="catalog-sheet-actions"><button type="button" onClick={clearCatalogFilters}>Clear all</button><button type="button" onClick={() => setMobileSheet(null)}>Show products</button></div>
+      </CompactBottomSheet>}
+    </div>
   );
 }
 
@@ -2377,7 +2596,7 @@ function OptionPill({
       : "border-[3px] border-[#4485FF] bg-white text-[#111]";
 
   return (
-    <button
+    <button aria-pressed={selected}
       onClick={onClick}
       className={`relative inline-flex items-center border font-medium transition-colors ${subLabel ? "h-[46px] min-w-[102px] justify-center rounded-[7px] px-2 text-[12px]" : tesla ? "h-10 min-w-[94px] justify-center rounded-[7px] px-3 text-[12px]" : "h-11 rounded-[7px] px-5 text-[12px]"} ${
         selected && tesla
@@ -2460,7 +2679,7 @@ function ManualVialPreview({
       // Keep the artwork at Retina density on standard external monitors too.
       // Recomputing from the live CSS size also prevents browser resampling when
       // the window moves between displays with different pixel densities.
-      const pixelDensity = compact
+      const pixelDensity = window.matchMedia("(max-width: 639px)").matches ? Math.min(window.devicePixelRatio || 1, 1.5) : compact
         ? Math.max(4, window.devicePixelRatio || 1)
         : Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       const width = Math.max(1, Math.round(bounds.width * pixelDensity));
@@ -2671,7 +2890,7 @@ function ManualVialPreview({
       role="img"
       aria-label={`${name}, ${strength}, ${size}`}
     >
-      <img src={baseImage} alt="" draggable={false} />
+      <img decoding="async" loading="lazy" src={baseImage} alt="" draggable={false} />
       <div className="manual-vial-label" aria-hidden="true">
         <canvas ref={labelCanvasRef} className="manual-vial-art" />
       </div>
@@ -2726,7 +2945,7 @@ function ManualNasalSprayPreview({
       const bounds = canvas.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return;
 
-      const pixelDensity = compact
+      const pixelDensity = window.matchMedia("(max-width: 639px)").matches ? Math.min(window.devicePixelRatio || 1, 1.5) : compact
         ? Math.max(variant === "topical" ? 4 : 3, window.devicePixelRatio || 1)
         : Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       const width = Math.max(1, Math.round(bounds.width * pixelDensity));
@@ -2910,7 +3129,7 @@ function ManualNasalSprayPreview({
 
   return (
     <div className={`${variant === "topical" ? "manual-topical-preview" : "manual-nasal-preview"} ${compact ? variant === "topical" ? "manual-topical-preview-compact" : "manual-nasal-preview-compact" : ""}`} role="img" aria-label={`${name}, ${strength}, ${variant}`}>
-      <img src={baseImage} alt="" draggable={false} />
+      <img decoding="async" loading="lazy" src={baseImage} alt="" draggable={false} />
       <div className={variant === "topical" ? "manual-topical-label" : "manual-nasal-label"} aria-hidden="true">
         <canvas ref={labelCanvasRef} className="manual-nasal-art" />
       </div>
@@ -2940,7 +3159,7 @@ function ManualPatchPreview({
       const bounds = canvas.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return;
 
-      const pixelDensity = compact
+      const pixelDensity = window.matchMedia("(max-width: 639px)").matches ? Math.min(window.devicePixelRatio || 1, 1.5) : compact
         ? Math.max(4, window.devicePixelRatio || 1)
         : Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       canvas.width = Math.max(1, Math.round(bounds.width * pixelDensity));
@@ -3027,7 +3246,7 @@ function ManualPatchPreview({
 
   return (
     <div className={`manual-patch-preview ${compact ? "manual-patch-preview-compact" : ""}`} role="img" aria-label={`${name}, ${strength}, patch`}>
-      <img src={blankPatchPackageReference} alt="" draggable={false} />
+      <img decoding="async" loading="lazy" src={blankPatchPackageReference} alt="" draggable={false} />
       <canvas ref={labelCanvasRef} className="manual-patch-label" aria-hidden="true" />
     </div>
   );
@@ -3072,7 +3291,7 @@ function ManualCapsulePreview({
       if (!canvas || cancelled) return;
       const bounds = canvas.getBoundingClientRect();
       if (bounds.width <= 0 || bounds.height <= 0) return;
-      const pixelDensity = compact ? Math.max(4, window.devicePixelRatio || 1) : Math.min(3, Math.max(2, window.devicePixelRatio || 1));
+      const pixelDensity = window.matchMedia("(max-width: 639px)").matches ? Math.min(window.devicePixelRatio || 1, 1.5) : compact ? Math.max(4, window.devicePixelRatio || 1) : Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       canvas.width = Math.max(1, Math.round(bounds.width * pixelDensity));
       canvas.height = Math.max(1, Math.round(bounds.height * pixelDensity));
       const context = canvas.getContext("2d");
@@ -3190,7 +3409,7 @@ function ManualCapsulePreview({
 
   return (
     <div className={`manual-capsule-preview ${compact ? "manual-capsule-preview-compact" : ""}`} role="img" aria-label={`${name}, ${strength}, capsule`}>
-      <img src={blankCapsuleBottleReference} alt="" draggable={false} />
+      <img decoding="async" loading="lazy" src={blankCapsuleBottleReference} alt="" draggable={false} />
       <div className="manual-capsule-label" aria-hidden="true">
         <canvas ref={labelCanvasRef} className="manual-capsule-art" />
       </div>
@@ -3247,6 +3466,7 @@ function ProductDetailPage({
   extraVariants: boolean;
   catalogType?: "503A" | "503B";
 }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
   const is503B = catalogType === "503B";
   const [enrollmentFormOpen, setEnrollmentFormOpen] = useState(false);
   const [completedEnrollments, setCompletedEnrollments] = useState<Set<string>>(() => new Set(["1st Choice Compounding Pharmacy"]));
@@ -3519,8 +3739,9 @@ function ProductDetailPage({
 
   return (
     <>
-      <div className="pl-[15px]">
-      <div className="-mt-4 mb-[39px]">
+      <div className="product-detail min-w-0 lg:pl-[15px]">
+      <MobilePageHeader title={product.name} onBack={() => onNavigate(catalogType === "503B" ? "catalog-503b" : "products")} />
+      <div className="max-lg:hidden -mt-4 mb-[39px]">
         <div className="flex items-start gap-3">
           {isReferenceStyle && (
             <PageBackButton onClick={() => onNavigate("products")} label="Back to catalog" />
@@ -3533,17 +3754,17 @@ function ProductDetailPage({
           </div>
         </div>
       </div>
-      {extraVariants && <div className="mb-5 flex flex-wrap items-center gap-2">
+      {extraVariants && <ScrollableTabs className="mb-5 flex items-center gap-2" activeKey={productDetailVariant} desktopLayout="wrap" aria-label="Product page style">
         <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#777]">Page style</span>
         {([1, 2, 3, 4, 5, 6] as const).map(variant => (
-          <button key={variant} onClick={() => setProductDetailVariant(variant)} className={`h-8 rounded-full px-3 text-[11px] font-semibold transition-colors ${productDetailVariant === variant ? "bg-[#111] text-white" : "border border-[#ddd] bg-white text-[#555] hover:border-[#999]"}`}>
+          <button data-active={productDetailVariant === variant} key={variant} onClick={() => setProductDetailVariant(variant)} className={`h-8 rounded-full px-3 text-[11px] font-semibold transition-colors ${productDetailVariant === variant ? "bg-[#111] text-white" : "border border-[#ddd] bg-white text-[#555] hover:border-[#999]"}`}>
             {variant}. {variant === 1 ? "Apple" : variant === 2 ? "Selection" : variant === 3 ? "Card Selection" : variant === 4 ? "Green" : variant === 5 ? "Reference" : "Blue"}
           </button>
         ))}
-      </div>}
+      </ScrollableTabs>}
       <div className={`grid max-w-[1180px] items-start gap-10 ${isReferenceStyle ? "xl:grid-cols-[minmax(0,1.1fr)_minmax(480px,0.9fr)]" : "xl:grid-cols-[minmax(0,1.244fr)_minmax(0,1fr)]"}`}>
         <div className="min-w-0">
-          <div className={`relative flex h-[600px] items-center justify-center overflow-hidden rounded-[18px] p-16 ${isReferenceStyle ? "bg-[#fafafa]" : `border border-[#e4e4e4] ${productDetailVariant === 2 ? "bg-[#fbfdfc]" : "bg-[#f8f8f8]"}`}`}>
+          <div className={`product-detail-art relative flex h-[360px] sm:h-[480px] lg:h-[600px] items-center justify-center overflow-hidden rounded-[18px] p-6 sm:p-10 lg:p-16 ${isReferenceStyle ? "bg-[#fafafa]" : `border border-[#e4e4e4] ${productDetailVariant === 2 ? "bg-[#fbfdfc]" : "bg-[#f8f8f8]"}`}`}>
             {product.img === blankVialReference || product.img === blankLyophilizedVialReference ? (
               <ManualVialPreview name={product.name} strength={strength} size={size} palette={product.vialPalette} baseImage={product.img} />
             ) : product.img === blankNasalSprayReference ? (
@@ -3555,7 +3776,7 @@ function ProductDetailPage({
             ) : product.img === blankCapsuleBottleReference ? (
               <ManualCapsulePreview name={product.name} strength={strength} palette={product.vialPalette} />
             ) : (
-              <img src={product.img} alt={product.name} className="max-h-[470px] h-full w-full object-contain mix-blend-multiply" />
+              <img decoding="async" loading="lazy" src={product.img} alt={product.name} className="max-h-[470px] h-full w-full object-contain mix-blend-multiply" />
             )}
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
@@ -3573,11 +3794,11 @@ function ProductDetailPage({
           </div>
         </div>
 
-        <div ref={configurationCardRef} className="min-w-0 -mt-[23px]">
+        <div ref={configurationCardRef} className="min-w-0 xl:-mt-[23px]">
           {isReferenceStyle ? (
-            <h1 className="text-left text-[32px] font-medium leading-tight tracking-[-0.02em] text-[#111]">{product.name}</h1>
+            <h1 className="hidden lg:block text-left text-[32px] font-medium leading-tight tracking-[-0.02em] text-[#111]">{product.name}</h1>
           ) : (
-            <h1 className="text-[30px] font-medium leading-tight text-[#111]">{product.name}</h1>
+            <h1 className="hidden lg:block text-[30px] font-medium leading-tight text-[#111]">{product.name}</h1>
           )}
           <p className="mt-1.5 max-w-[500px] text-[13px] leading-[1.45] text-[#666]">A compounded {product.dosage.toLowerCase()} developed for personalized {product.areaOfTreatment.toLowerCase()} treatment and patient care.</p>
           <div key={priceChangeKey} className="mt-3 flex animate-[pulse_600ms_ease-out_1] items-center rounded-[7px]">
@@ -3595,16 +3816,16 @@ function ProductDetailPage({
 
           <div className={`${isReferenceStyle ? "mt-6" : "mt-2 border-t border-[#ededed] pt-2"}`}>
             <div className={isReferenceStyle ? "mb-3 flex items-center gap-3" : ""}><p className={`${isReferenceStyle ? "shrink-0 text-[12px] font-medium" : "mb-2 text-[12px] font-medium"} text-[#111]`}>Size</p>{isReferenceStyle && <span className="h-px flex-1 bg-[#e5e5e5]" />}</div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 [&>button]:w-full [&>button]:min-w-0">
+            <ScrollableTabs className="grid grid-cols-2 gap-2 sm:grid-cols-4 [&>button]:w-full [&>button]:min-w-0" activeKey={size} desktopLayout="grid" aria-label="Product size">
               {sizeOptions.map(option => <OptionPill key={option} label={option} selected={size === option} onClick={() => setSize(option)} emphasis={productDetailVariant === 2} card={productDetailVariant === 3} tesla={isReferenceStyle} blue={isBlueReference} tone={productDetailVariant === 4 ? "green" : "apple"} />)}
-            </div>
+            </ScrollableTabs>
           </div>
 
           <div className={`${isReferenceStyle ? "mt-5" : "mt-3 border-t border-[#ededed] pt-2"}`}>
             <div className={isReferenceStyle ? "mb-3 flex items-center gap-3" : ""}><p className={`${isReferenceStyle ? "shrink-0 text-[12px] font-medium" : "mb-2 text-[12px] font-medium"} text-[#111]`}>Strength</p>{isReferenceStyle && <span className="h-px flex-1 bg-[#e5e5e5]" />}</div>
-            <div className={`grid grid-cols-2 gap-1.5 [&>button]:w-full [&>button]:min-w-0 ${usesWideStrengthCards ? "[&>button]:h-[58px]" : "sm:grid-cols-4"}`}>
+            <ScrollableTabs className={`grid grid-cols-2 gap-1.5 [&>button]:w-full [&>button]:min-w-0 ${usesWideStrengthCards ? "[&>button]:h-[58px]" : "sm:grid-cols-4"}`} activeKey={strength} desktopLayout="grid" aria-label="Product strength">
               {strengthOptions.map(option => <OptionPill key={option} label={option} subLabel={isCompoundProduct ? "Combined strength" : "150mg total"} selected={strength === option} onClick={() => setStrength(option)} emphasis={productDetailVariant === 2} card={productDetailVariant === 3} tesla={isReferenceStyle} blue={isBlueReference} tone={productDetailVariant === 4 ? "green" : "apple"} />)}
-            </div>
+            </ScrollableTabs>
           </div>
 
           {!discountApplied && (
@@ -3640,9 +3861,9 @@ function ProductDetailPage({
           {!is503B && (
           <div className={`${isReferenceStyle ? "mt-5" : "mt-3 border-t border-[#ededed] pt-2"}`}>
             <div className={isReferenceStyle ? "mb-3 flex items-center gap-3" : ""}><p className={`${isReferenceStyle ? "shrink-0 text-[12px] font-medium" : "mb-2 text-[12px] font-medium"} text-[#111]`}>{product.dosage === "Injection" ? "Injection Type" : "Form"}</p>{isReferenceStyle && <span className="h-px flex-1 bg-[#e5e5e5]" />}</div>
-            <div className="flex flex-wrap gap-2">
+            <ScrollableTabs className="flex gap-2" activeKey={injType} desktopLayout="wrap" aria-label="Product form">
               {(product.dosage === "Injection" ? ["Subcutaneous", "Intramuscular"] : [product.dosage]).map(option => <OptionPill key={option} label={option} selected={injType === option} onClick={() => setInjType(option)} emphasis={productDetailVariant === 2} card={productDetailVariant === 3} tesla={isReferenceStyle} blue={isBlueReference} tone={productDetailVariant === 4 ? "green" : "apple"} />)}
-            </div>
+            </ScrollableTabs>
           </div>
           )}
 
@@ -3695,18 +3916,18 @@ function ProductDetailPage({
             {selectedPatientCount > 1 && (
               <p className="mt-2 flex items-center gap-1.5 text-[10px] font-medium leading-[14px] text-[#c2413b]"><TriangleAlert size={13} strokeWidth={2} className="shrink-0" />Ship to Patient is disabled due to multiple patients in cart.</p>
             )}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button disabled={selectedPatientCount > 1} onClick={() => selectShippingChoice("patient")} className={`relative inline-flex h-9 items-center gap-2 border px-3 text-[11px] font-semibold transition-colors ${isReferenceStyle ? "rounded-[7px]" : "rounded-full"} ${selectedPatientCount > 1 ? "cursor-not-allowed border-[#e0e2e1] bg-[#f7f7f6] text-[#a7aaa8] opacity-70" : shippingChoice === "patient" && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : shippingChoice === "patient" ? (productDetailVariant === 4 ? "border-2 border-[#00B53F] bg-white text-[#202020] shadow-[0_0_0_3px_rgba(0,181,63,0.10)]" : productDetailVariant === 1 ? "border-[3px] border-[#4485FF] bg-white text-[#202020]" : isBlueReference ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : isReferenceStyle ? "border-2 border-[#171a20] bg-white text-[#171a20]" : "border-[#183229] bg-[#eef7f2] text-[#183229]") : "border-[#d8dedd] bg-white text-[#6f7782]"}`}>
+            <ScrollableTabs className="mt-3 flex gap-2" activeKey={shippingChoice} desktopLayout="wrap" aria-label="Product shipping destination">
+              <button data-active={shippingChoice === "patient"} disabled={selectedPatientCount > 1} onClick={() => selectShippingChoice("patient")} className={`relative inline-flex h-9 items-center gap-2 border px-3 text-[11px] font-semibold transition-colors ${isReferenceStyle ? "rounded-[7px]" : "rounded-full"} ${selectedPatientCount > 1 ? "cursor-not-allowed border-[#e0e2e1] bg-[#f7f7f6] text-[#a7aaa8] opacity-70" : shippingChoice === "patient" && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : shippingChoice === "patient" ? (productDetailVariant === 4 ? "border-2 border-[#00B53F] bg-white text-[#202020] shadow-[0_0_0_3px_rgba(0,181,63,0.10)]" : productDetailVariant === 1 ? "border-[3px] border-[#4485FF] bg-white text-[#202020]" : isBlueReference ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : isReferenceStyle ? "border-2 border-[#171a20] bg-white text-[#171a20]" : "border-[#183229] bg-[#eef7f2] text-[#183229]") : "border-[#d8dedd] bg-white text-[#6f7782]"}`}>
                 {shippingChoice === "patient" && productDetailVariant === 2 && <CheckCircle2 size={13} />}
                 {shippingChoice === "patient" && isReferenceStyle && <CheckCircle2 size={18} strokeWidth={2.2} className={`absolute -right-2 -top-2 text-white ${isBlueReference ? "fill-[#2563EB]" : "fill-black"}`} />}
                 <User size={13} strokeWidth={1.8} /> Ship to Patient
               </button>
-              <button onClick={() => selectShippingChoice("clinic")} className={`relative inline-flex h-9 items-center gap-2 border px-3 text-[11px] font-semibold transition-colors ${isReferenceStyle ? "rounded-[7px]" : "rounded-full"} ${shippingChoice === "clinic" && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : shippingChoice === "clinic" ? (productDetailVariant === 4 ? "border-2 border-[#00B53F] bg-white text-[#202020] shadow-[0_0_0_3px_rgba(0,181,63,0.10)]" : productDetailVariant === 1 ? "border-[3px] border-[#4485FF] bg-white text-[#202020]" : isBlueReference ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : isReferenceStyle ? "border-2 border-[#171a20] bg-white text-[#171a20]" : "border-[#183229] bg-[#eef7f2] text-[#183229]") : "border-[#d8dedd] bg-white text-[#6f7782]"}`}>
+              <button data-active={shippingChoice === "clinic"} onClick={() => selectShippingChoice("clinic")} className={`relative inline-flex h-9 items-center gap-2 border px-3 text-[11px] font-semibold transition-colors ${isReferenceStyle ? "rounded-[7px]" : "rounded-full"} ${shippingChoice === "clinic" && productDetailVariant === 2 ? "border-[#183229] bg-[#183229] text-white shadow-[0_8px_18px_rgba(24,50,41,0.16)]" : shippingChoice === "clinic" ? (productDetailVariant === 4 ? "border-2 border-[#00B53F] bg-white text-[#202020] shadow-[0_0_0_3px_rgba(0,181,63,0.10)]" : productDetailVariant === 1 ? "border-[3px] border-[#4485FF] bg-white text-[#202020]" : isBlueReference ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : isReferenceStyle ? "border-2 border-[#171a20] bg-white text-[#171a20]" : "border-[#183229] bg-[#eef7f2] text-[#183229]") : "border-[#d8dedd] bg-white text-[#6f7782]"}`}>
                 {shippingChoice === "clinic" && productDetailVariant === 2 && <CheckCircle2 size={13} />}
                 {shippingChoice === "clinic" && isReferenceStyle && <CheckCircle2 size={18} strokeWidth={2.2} className={`absolute -right-2 -top-2 text-white ${isBlueReference ? "fill-[#2563EB]" : "fill-black"}`} />}
                 <Building2 size={13} strokeWidth={1.8} /> Ship to Clinic
               </button>
-            </div>
+            </ScrollableTabs>
             <p className="mt-2 text-[10px] text-[#7a837f]">{shippingChoice === "clinic" ? "You can select multiple patients for one clinic shipment." : "You can select one patient for this shipment."}</p>
           </div>
           )}
@@ -3893,8 +4114,7 @@ function ProductDetailPage({
           <p className="mt-3 text-[13px] leading-6 text-[#555]">This combination is a cornerstone of modern longevity and body composition protocols. By activating two separate pathways (GHRH and Ghrelin receptors), this formulation facilitates significant fat loss and supports the preservation of lean muscle tissue. Because it preserves the body's natural regulatory feedback loops, it offers a physiological approach to age-management, improving systemic vitality, sleep quality, and physical recovery.</p>
 
           <h3 className="mt-8 text-[16px] font-medium text-[#202020]">Product List</h3>
-          <div className="mt-3 overflow-x-auto rounded-[10px] border border-[#e5e5e5]">
-            <table className="w-full min-w-[700px] text-left text-[12px]">
+          <div className="table-scroll mt-3 overflow-x-auto rounded-[10px] border border-[#e5e5e5]" tabIndex={0} role="region" aria-label="Scrollable table — swipe or scroll horizontally"><p className="table-scroll-hint">Swipe to see all columns <span aria-hidden="true">↔</span></p><table className="w-full min-w-[700px] text-left text-[12px]">
               <thead className="bg-[#f7f7f7] text-[10px] uppercase tracking-[0.07em] text-[#777]"><tr><th className="px-4 py-3">Item Name</th><th className="px-4 py-3">Strength (TESA/IPAM)</th><th className="px-4 py-3">Form</th><th className="px-4 py-3">Quantity</th></tr></thead>
               <tbody><tr><td className="px-4 py-3.5">Tesamorelin / Ipamorelin</td><td className="px-4 py-3.5">2.4mg / 1.2mg / mL</td><td className="px-4 py-3.5">Injection</td><td className="px-4 py-3.5">5 mL Vial</td></tr></tbody>
             </table>
@@ -3909,8 +4129,7 @@ function ProductDetailPage({
 
           <h3 className="mt-8 text-[16px] font-medium text-[#202020]">Typical Dosage and Administration</h3>
           <p className="mt-3 text-[12px] italic leading-5 text-[#555]">Dosing is administered via subcutaneous (SQ) injection, ideally at bedtime. To maximize the growth hormone pulse, avoid eating for at least 2 hours before administration.</p>
-          <div className="mt-4 overflow-x-auto rounded-[10px] border border-[#e5e5e5]">
-            <table className="w-full min-w-[700px] text-left text-[12px]">
+          <div className="table-scroll mt-4 overflow-x-auto rounded-[10px] border border-[#e5e5e5]" tabIndex={0} role="region" aria-label="Scrollable table — swipe or scroll horizontally"><p className="table-scroll-hint">Swipe to see all columns <span aria-hidden="true">↔</span></p><table className="w-full min-w-[700px] text-left text-[12px]">
               <thead className="bg-[#f7f7f7] text-[10px] uppercase tracking-[0.07em] text-[#777]"><tr><th className="px-4 py-3">Goal</th><th className="px-4 py-3">Frequency</th><th className="px-4 py-3">Route</th><th className="px-4 py-3">Notes</th></tr></thead>
               <tbody className="divide-y divide-[#ebebeb] text-[#424242]">
                 <tr><td className="px-4 py-3">Visceral Fat Loss</td><td className="px-4 py-3">Once Daily</td><td className="px-4 py-3">Subcutaneous</td><td className="px-4 py-3">1.2mg/0.6mg standard dose</td></tr>
@@ -3945,7 +4164,7 @@ function ProductDetailPage({
           <h2 className="text-[20px] font-medium tracking-[-0.02em] text-[#171717]">Product Supply</h2>
           <div className="mt-5 flex h-[393px] w-[268px] max-w-full flex-col overflow-hidden rounded-[14px] border border-[#e4e4e4] bg-white">
             <div className="flex h-[190px] shrink-0 items-center justify-center overflow-hidden bg-[#fafafa] p-5">
-              <img src={productSupplyPack} alt="Subcutaneous supplies kit with a syringe, packaged needle, and alcohol prep pads" className="h-full w-full object-contain mix-blend-multiply" />
+              <img decoding="async" loading="lazy" src={productSupplyPack} alt="Subcutaneous supplies kit with a syringe, packaged needle, and alcohol prep pads" className="h-full w-full object-contain mix-blend-multiply" />
             </div>
             <div className="flex min-h-0 flex-1 flex-col p-4">
               <h3 className="text-[15px] font-medium leading-5 text-[#1d1d1d]">SQ Supplies Pack</h3>
@@ -3996,12 +4215,13 @@ function ProductDetailPage({
       )}
 
       {questionModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="product-question-title">
+        <ModalLayer onClose={() => setQuestionModalOpen(false)} className="fixed inset-0 z-[120] flex items-center justify-center bg-black/35 px-4 py-6 backdrop-blur-[2px]" labelledBy="product-question-title">
           <div className="w-full max-w-[560px] rounded-[18px] border border-[#ece8e3] bg-white p-5 shadow-[0_28px_80px_rgba(0,0,0,0.22)]">
-            <div className="flex items-start justify-between gap-4">
+            <MobilePageHeader title="Ask a Question" onBack={() => setQuestionModalOpen(false)} className="mobile-sheet-header mobile-sheet-inset" subtitle="We will attach this product setup so the team has the right context." titleId="product-question-title" />
+            <div className="max-lg:hidden flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8c95a1]">Support ticket</p>
-                <h2 id="product-question-title" className="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-[#111]">Ask a Question</h2>
+                <h2 id={compactNavigation ? undefined : "product-question-title"} className="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-[#111]">Ask a Question</h2>
                 <p className="mt-1 text-[12px] leading-5 text-[#6f7782]">We will attach this product setup so the team has the right context.</p>
               </div>
               <button
@@ -4018,7 +4238,7 @@ function ProductDetailPage({
               <p className="mb-2 text-[11px] font-medium text-[#6c746f]">Product</p>
               <div className="flex items-center gap-3">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-[10px] bg-white">
-                  <img src={product.img} alt={product.name} className="h-10 w-10 object-contain mix-blend-multiply" />
+                  <img decoding="async" loading="lazy" src={product.img} alt={product.name} className="h-10 w-10 object-contain mix-blend-multiply" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-semibold text-[#151515]">{product.name}</p>
@@ -4068,16 +4288,17 @@ function ProductDetailPage({
               </button>
             </div>
           </div>
-        </div>
+        </ModalLayer>
       )}
       {createPatientOpen && (
-        <div className="fixed inset-0 z-[80] flex justify-end bg-black/30 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setCreatePatientOpen(false)} className="fixed inset-0 z-[80] flex justify-end bg-black/30 backdrop-blur-[2px]" label="Product Detail">
           <button className="absolute inset-0 cursor-default" onClick={() => setCreatePatientOpen(false)} aria-label="Close create patient" />
           <form
             onSubmit={event => { event.preventDefault(); setCreatePatientOpen(false); }}
             className="relative flex h-full w-full max-w-[680px] flex-col overflow-hidden rounded-l-[16px] border-l border-[#e4e1dd] bg-white shadow-[-18px_0_55px_rgba(0,0,0,0.16)]"
           >
-            <div className="flex items-center justify-between border-b border-[#ece9e5] px-6 py-5">
+            <MobilePageHeader title="Create Patient" onBack={() => setCreatePatientOpen(false)} className="mobile-sheet-header" subtitle="Enter the patient’s personal and contact information."  />
+            <div className="max-lg:hidden flex items-center justify-between border-b border-[#ece9e5] px-6 py-5">
               <div>
                 <h2 className="text-[20px] font-semibold text-[#171717]">Create Patient</h2>
                 <p className="mt-1 text-[11px] text-[#777]">Enter the patient’s personal and contact information.</p>
@@ -4091,27 +4312,27 @@ function ProductDetailPage({
                   ["First Name", "firstName", "Write...", "text", true],
                   ["Last Name", "lastName", "Write...", "text", true],
                 ].map(([label, name, placeholder, type, required]) => (
-                  <label key={String(name)} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input name={String(name)} type={String(type)} required={Boolean(required)} placeholder={String(placeholder)} className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                  <label key={String(name)} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input {...inputMetadata(String(name))} name={String(name)} type={String(type)} required={Boolean(required)} placeholder={String(placeholder)} className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
                 ))}
-                <label className="block text-[11px] font-medium text-[#242424]">Gender <span className="text-[#b44b42]">*</span><select name="gender" required defaultValue="" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]"><option value="" disabled>Select</option><option>Female</option><option>Male</option><option>Other</option></select></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Birth Date <span className="text-[#b44b42]">*</span><input name="birthDate" type="date" required className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Primary Phone <span className="text-[#b44b42]">*</span><input name="primaryPhone" type="tel" required placeholder="(000) 000-0000" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Secondary Phone<input name="secondaryPhone" type="tel" placeholder="(000) 000-0000" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Address 1 <span className="text-[#b44b42]">*</span><input name="address1" required placeholder="Start typing address..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Apt, Floor, etc.<input name="address2" placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">State <span className="text-[#b44b42]">*</span><select name="state" required defaultValue="" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]"><option value="" disabled>Select a state</option><option>Florida</option><option>New York</option><option>Texas</option><option>California</option></select></label>
-                <label className="block text-[11px] font-medium text-[#242424]">City <span className="text-[#b44b42]">*</span><input name="city" required placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Zip Code <span className="text-[#b44b42]">*</span><input name="zip" required placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Allergies<input name="allergies" placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
-                <label className="block text-[11px] font-medium text-[#242424]">Email<input name="email" type="email" placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Gender <span className="text-[#b44b42]">*</span><select autoComplete="sex" name="gender" required defaultValue="" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]"><option value="" disabled>Select</option><option>Female</option><option>Male</option><option>Other</option></select></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Birth Date <span className="text-[#b44b42]">*</span><input {...inputMetadata("birthDate")} name="birthDate" type="date" required className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Primary Phone <span className="text-[#b44b42]">*</span><input {...inputMetadata("primaryPhone")} name="primaryPhone" type="tel" required placeholder="(000) 000-0000" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Secondary Phone<input {...inputMetadata("secondaryPhone")} name="secondaryPhone" type="tel" placeholder="(000) 000-0000" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Address 1 <span className="text-[#b44b42]">*</span><input {...inputMetadata("address1")} name="address1" required placeholder="Start typing address..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Apt, Floor, etc.<input {...inputMetadata("address2")} name="address2" placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">State <span className="text-[#b44b42]">*</span><select autoComplete="address-level1" name="state" required defaultValue="" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]"><option value="" disabled>Select a state</option><option>Florida</option><option>New York</option><option>Texas</option><option>California</option></select></label>
+                <label className="block text-[11px] font-medium text-[#242424]">City <span className="text-[#b44b42]">*</span><input {...inputMetadata("city")} name="city" required placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Zip Code <span className="text-[#b44b42]">*</span><input {...inputMetadata("zip")} name="zip" required placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Allergies<input {...inputMetadata("allergies")} name="allergies" placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
+                <label className="block text-[11px] font-medium text-[#242424]">Email<input {...inputMetadata("email")} name="email" type="email" placeholder="Write..." className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none placeholder:text-[#b8b8b5] focus:border-[#202020]" /></label>
                 <label className="block text-[11px] font-medium text-[#242424]">Language<select name="language" defaultValue="" className="mt-1.5 h-10 w-full rounded-[9px] border border-[#dddcd8] bg-white px-3 text-[12px] text-[#555] outline-none focus:border-[#202020]"><option value="" disabled>Select</option><option>English</option><option>Spanish</option><option>Albanian</option></select></label>
               </div>
 
               <div className="mt-5 border-t border-[#ece9e5] pt-5">
                 <h3 className="text-[12px] font-semibold text-[#242424]">BMI Classification</h3>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                  <label className="block text-[11px] font-medium text-[#242424]">Weight<div className="mt-1.5 flex gap-2"><input name="weight" type="number" min="0" placeholder="Write..." className="h-10 min-w-0 flex-1 rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none focus:border-[#202020]" /><select name="weightUnit" className="h-10 w-20 rounded-[9px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>lb</option><option>kg</option></select></div></label>
-                  <label className="block text-[11px] font-medium text-[#242424]">Height<div className="mt-1.5 flex gap-2"><input name="height" type="number" min="0" placeholder="Write..." className="h-10 min-w-0 flex-1 rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none focus:border-[#202020]" /><select name="heightUnit" className="h-10 w-20 rounded-[9px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>in</option><option>cm</option></select></div></label>
+                  <label className="block text-[11px] font-medium text-[#242424]">Weight<div className="mt-1.5 flex gap-2"><input {...inputMetadata("weight")} name="weight" type="number" inputMode="decimal" step="any" min="0" placeholder="Write..." className="h-10 min-w-0 flex-1 rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none focus:border-[#202020]" /><select name="weightUnit" className="h-10 w-20 rounded-[9px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>lb</option><option>kg</option></select></div></label>
+                  <label className="block text-[11px] font-medium text-[#242424]">Height<div className="mt-1.5 flex gap-2"><input {...inputMetadata("height")} name="height" type="number" inputMode="decimal" step="any" min="0" placeholder="Write..." className="h-10 min-w-0 flex-1 rounded-[9px] border border-[#dddcd8] px-3 text-[12px] outline-none focus:border-[#202020]" /><select name="heightUnit" className="h-10 w-20 rounded-[9px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>in</option><option>cm</option></select></div></label>
                 </div>
               </div>
             </div>
@@ -4120,7 +4341,7 @@ function ProductDetailPage({
               <button type="submit" className="h-11 w-full rounded-[8px] bg-[#111] px-6 text-[12px] font-semibold text-white hover:bg-black">Save Patient</button>
             </div>
           </form>
-        </div>
+        </ModalLayer>
       )}
     </>
   );
@@ -4155,7 +4376,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         ))}
       </section>
 
-      <div className="mb-6 grid grid-cols-[minmax(0,1fr)_310px] gap-4 max-lg:grid-cols-1">
+      <div className="mb-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_310px] gap-4">
         <section className="rounded-[14px] bg-[#FBFBFB] p-2">
           <div className="flex items-center justify-between px-3 py-3">
             <div><h2 className="text-[15px] font-semibold text-[#1a1a1a]">Recent orders</h2><p className="mt-1 text-[10px] text-[#929694]">Latest prescriptions submitted by your clinic.</p></div>
@@ -4165,7 +4386,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             {RECENT_ORDERS.map((order) => {
               const statusClass = order.status === "Delivered" ? "bg-[#ecf8ef] text-[#31583F]" : order.status === "Pending" ? "bg-[#fff4eb] text-[#8A4338]" : "bg-[#edf6f2] text-[#31584A]";
               return (
-                <button key={order.id} onClick={() => onNavigate("orders")} className="grid w-full grid-cols-[minmax(160px,1fr)_minmax(130px,.9fr)_104px_70px_72px_20px] items-center gap-3 rounded-[11px] bg-white px-3 py-3 text-left transition-colors hover:bg-[#fffcfa] max-md:grid-cols-[1fr_auto_18px]">
+                <button key={order.id} onClick={() => onNavigate("orders")} className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,.9fr)_90px_50px_62px_20px] items-center gap-3 rounded-[11px] bg-white px-3 py-3 text-left transition-colors hover:bg-[#fffcfa] max-md:grid-cols-[1fr_auto_18px]">
                   <span className="min-w-0"><span className="block truncate text-[11px] font-semibold text-[#252525]">{order.patient}</span><span className="mt-0.5 block text-[9px] text-[#999]">{order.id}</span></span>
                   <span className="truncate text-[11px] text-[#5f6461] max-md:hidden">{order.product}</span>
                   <span className={`w-fit rounded-full px-2.5 py-1.5 text-[9px] font-semibold ${statusClass}`}>{order.status}</span>
@@ -4202,7 +4423,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         <div className="grid grid-cols-6 gap-2 max-xl:grid-cols-3 max-md:grid-cols-2">
           {ALL_PRODUCTS.slice(0, 6).map((product) => (
             <button key={product.id} onClick={() => onNavigate("product-detail")} className="group rounded-[11px] bg-white px-3 pb-2.5 pt-2 text-left transition-colors hover:bg-[#fffefd]">
-              <div className="flex h-[84px] items-center justify-center overflow-hidden rounded-[9px] bg-[#FCFCFC]"><img src={product.img} alt={product.name} className="h-[92%] max-w-full object-contain mix-blend-multiply transition-transform duration-200 group-hover:scale-[1.04]" /></div>
+              <div className="flex h-[84px] items-center justify-center overflow-hidden rounded-[9px] bg-[#FCFCFC]"><img decoding="async" loading="lazy" src={product.img} alt={product.name} className="h-[92%] max-w-full object-contain mix-blend-multiply transition-transform duration-200 group-hover:scale-[1.04]" /></div>
               <p className="mt-2 truncate text-[10px] font-semibold leading-4 text-[#252525]">{product.name}</p>
               <div className="mt-1 flex items-center justify-between"><span className="text-[11px] font-semibold text-[#1a1a1a]">{product.price}</span><span className="flex size-5 items-center justify-center rounded-full bg-[#f2f1ee] text-[#183229]"><ChevronRight size={11} /></span></div>
             </button>
@@ -4294,7 +4515,7 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
-      className="text-[#c0c0c0] hover:text-[#183229] transition-colors flex-shrink-0"
+      aria-label={copied ? "Copied" : "Copy to clipboard"} className="text-[#c0c0c0] hover:text-[#183229] transition-colors flex-shrink-0"
       onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
       title={copied ? "Copied!" : "Copy"}
     >
@@ -4412,8 +4633,9 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
   return (
     <>
       <div className="max-w-[1400px]">
-      <div className="mb-5 flex flex-col gap-3">
-        <div className="flex flex-col items-start gap-3">
+      <div className="mb-5 flex flex-col gap-3 mobile-orders-header">
+        <MobilePageHeader title="Orders" search={{ value: search, onChange: setSearch, placeholder: "Search by order, patient, or item" }} />
+      <div className="max-lg:hidden flex flex-col items-start gap-3">
           <h1 className="flex h-[38px] items-center text-[28px] font-semibold leading-tight text-[#1a1a1a]">Orders</h1>
           <div className="group mt-[17px] flex h-[38px] w-full items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:border-2 focus-within:border-black sm:w-[220px] sm:focus-within:w-[310px]">
             <Search size={14} strokeWidth={1.8} className="flex-shrink-0 text-[#686868] transition-transform duration-300 group-focus-within:scale-110" />
@@ -4423,32 +4645,32 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
               className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:font-medium placeholder:text-[#686868]"
               placeholder="Search by order, patient, or item"
             />
-            <span className="shrink-0 text-[10px] text-[#686868]">⌘ F</span>
+            <span className="search-shortcut shrink-0 text-[10px] text-[#686868]">⌘ F</span>
           </div>
         </div>
 
-        <div className="flex items-end gap-4 overflow-x-auto border-b border-[#e3e3e3] px-1">
+        <ScrollableTabs className="flex items-end gap-4 overflow-x-auto border-b border-[#e3e3e3] px-1" activeKey={filter} aria-label="Filter orders by status" role="group">
           {tabs.map((tab) => {
             const isActive = filter === tab;
             return (
-              <button
+              <button data-active={isActive}
                 key={tab}
                 onClick={() => setFilter(tab)}
-                className={`relative h-[46px] whitespace-nowrap px-0.5 text-[12px] font-medium transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:transition-colors ${
+                className={`relative inline-flex h-[46px] shrink-0 items-center gap-1.5 whitespace-nowrap px-0.5 text-[12px] font-medium transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:transition-colors ${
                   isActive ? "text-[#171717] after:bg-[#183229]" : "text-[#555] after:bg-transparent hover:text-[#171717]"
                 }`}
               >
                 <span>{tab}</span>
-                <span className={`ml-1.5 inline-flex size-[18px] items-center justify-center rounded-full text-[9px] font-semibold ${isActive ? "bg-[#183229] text-white" : "bg-[#eeeeec] text-[#777]"}`}>{tabCount(tab)}</span>
+                <span className={`scrollable-tab-count inline-flex h-[18px] items-center justify-center rounded-full px-1 text-[9px] font-semibold ${isActive ? "bg-[#183229] text-white" : "bg-[#eeeeec] text-[#777]"}`}>{tabCount(tab)}</span>
               </button>
             );
           })}
-        </div>
+        </ScrollableTabs>
 
-        {extraVariants && <div className="flex items-center gap-2 pt-1">
+        {extraVariants && <ScrollableTabs className="flex items-center gap-2 pt-1" activeKey={orderCardVariant} desktopLayout="wrap" aria-label="Order card style">
           <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#888]">Card style</span>
 	          {(["silver", "cart", "multi"] as const).map(variant => (
-	            <button
+	            <button data-active={orderCardVariant === variant}
 	              key={variant}
 	              onClick={() => setOrderCardVariant(variant)}
 	              className={`h-8 rounded-full px-3 text-[11px] font-semibold capitalize transition-colors ${orderCardVariant === variant ? "bg-[#111] text-white" : "border border-[#ddd] bg-white text-[#555] hover:border-[#999]"}`}
@@ -4456,7 +4678,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
 	              {variant === "cart" ? "Cart style" : variant === "multi" ? "Patient lanes" : "Current"}
 	            </button>
 	          ))}
-        </div>}
+        </ScrollableTabs>}
 
       </div>
 
@@ -4488,7 +4710,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                   }));
               return (
                 <section key={order.id} onClick={() => onOrderSelect(order)} className="cursor-pointer rounded-[10px] bg-[#F8F8F8] px-5 pb-3 pt-5 transition-colors hover:bg-[#f6f6f5]">
-                  <div className="mb-2 hidden grid-cols-[minmax(310px,1.05fr)_minmax(260px,1fr)_minmax(240px,0.9fr)_70px] gap-7 px-5 md:grid">
+                  <div className="mb-2 hidden grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_minmax(0,0.9fr)_70px] gap-7 px-5 md:grid">
                     <p className="text-[12px] font-semibold text-[#555]">Prescription</p>
                     <p className="text-[12px] font-semibold text-[#555]">Patient</p>
                     <p className="text-[12px] font-semibold text-[#555]">Pharmacy</p>
@@ -4499,10 +4721,10 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                     {compactRows.map(({ item, patient, image, index }) => {
                       const trackingBlue = index % 2 === 1;
                       return (
-                        <div key={`${order.id}-${patient.name}-${item.name}-${index}`} className={`grid items-center gap-7 bg-white px-5 md:grid-cols-[minmax(310px,1.05fr)_minmax(260px,1fr)_minmax(240px,0.9fr)_70px] ${hasMultiplePatients ? "min-h-[104px] py-3" : "min-h-[122px] rounded-[9px] py-5"}`}>
+                        <div key={`${order.id}-${patient.name}-${item.name}-${index}`} className={`grid items-center gap-7 bg-white px-5 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_minmax(0,0.9fr)_70px] ${hasMultiplePatients ? "min-h-[104px] py-3" : "min-h-[122px] rounded-[9px] py-5"}`}>
                           <div className="flex min-w-0 items-center gap-4">
                             <div className="flex h-[70px] w-[58px] shrink-0 items-center justify-center overflow-visible">
-                              <img src={image} alt="" className="max-h-[70px] max-w-[52px] object-contain" />
+                              <img decoding="async" loading="lazy" src={image} alt="" className="max-h-[70px] max-w-[52px] object-contain" />
                             </div>
                             <div className="min-w-0">
                             <p className="truncate text-[14px] font-semibold text-[#161a18]">{item.name}</p>
@@ -4633,7 +4855,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
 	                              <div key={`${order.id}-${patient.name}-${item.name}-${index}`} className="rounded-[11px] bg-[#FAFAFA] p-3">
 	                                <div className="flex min-w-0 items-start gap-3">
 	                                  <div className="flex h-[72px] w-[58px] shrink-0 items-center justify-center overflow-visible rounded-[9px] bg-white">
-	                                    <img src={item.image} alt="" className="max-h-[70px] max-w-[52px] object-contain mix-blend-multiply" />
+	                                    <img decoding="async" loading="lazy" src={item.image} alt="" className="max-h-[70px] max-w-[52px] object-contain mix-blend-multiply" />
 	                                  </div>
 	                                  <div className="min-w-0 flex-1">
 	                                    <div className="flex items-start justify-between gap-3">
@@ -4728,7 +4950,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                     {(expandedItems[order.id] ? order.items : order.items.slice(0, 2)).map((item, index) => (
                       <article key={`${order.id}-${item.name}`} className="flex min-h-[142px] gap-4 rounded-[10px] bg-[#FFFAF7] p-4">
                         <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden bg-white">
-                          <img src={item.image} alt="" className="size-16 object-contain mix-blend-multiply" />
+                          <img decoding="async" loading="lazy" src={item.image} alt="" className="size-16 object-contain mix-blend-multiply" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
@@ -4772,7 +4994,7 @@ function OrdersPage({ onNavigate, onOrderSelect, extraVariants }: { onNavigate: 
                         <div className="flex items-start justify-between gap-3 px-3">
                           <div className="flex min-w-0 gap-3">
                             <div className={`flex size-12 shrink-0 items-center justify-center overflow-hidden bg-white ${orderCardVariant === "current" ? "rounded-[8px] border border-[#eee8e3]" : ""}`}>
-                              <img src={item.image} alt="" className="h-12 w-12 object-contain mix-blend-multiply" />
+                              <img decoding="async" loading="lazy" src={item.image} alt="" className="h-12 w-12 object-contain mix-blend-multiply" />
                             </div>
                             <div className="min-w-0">
                               <p className="text-[12px] font-semibold text-[#1a1a1a]">{item.name}</p>
@@ -4839,7 +5061,12 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
   return (
     <>
       <div className="max-w-[1400px]">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <MobilePageHeader title={`Order ${order.id}`} onBack={() => onNavigate("orders")} actions={<>
+        <MobileHeaderAction aria-label="Download receipt"><Download size={20} /></MobileHeaderAction>
+        <MobileHeaderAction aria-label="Create Ticket" onClick={() => setCreateTicketModalOpen(true)}><Plus size={20} /></MobileHeaderAction>
+        <MobileHeaderAction aria-label="Request cancellation" onClick={() => setCancellationModalOpen(true)}><XCircle size={20} /></MobileHeaderAction>
+      </>} />
+      <div className="max-lg:hidden mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <PageBackButton onClick={() => onNavigate("orders")} label="Back to orders" />
           <h1 className="text-[22px] font-semibold text-[#1a1a1a]">Orders</h1>
@@ -4910,7 +5137,7 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
                     <div className="grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_70px_70px_70px_90px]">
                       <div className="flex gap-3">
                         <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[7px] border border-[#eeeeec] bg-white">
-                          <img src={item.image} alt="" className="size-11 object-contain mix-blend-multiply" />
+                          <img decoding="async" loading="lazy" src={item.image} alt="" className="size-11 object-contain mix-blend-multiply" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -4923,9 +5150,9 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
                           {isSupply && <p className="mt-1 text-[10px] text-[#8c95a1]">Suitable amount</p>}
                         </div>
                       </div>
-                      <div className="max-md:hidden"><p className={compactLabel}>Days Supply</p><p className="mt-2 text-[11px] font-semibold">{item.daysSupply}</p></div>
-                      <div className="max-md:hidden"><p className={compactLabel}>Refills</p><p className="mt-2 text-[11px] font-semibold">{item.authRefills}</p></div>
-                      <div className="max-md:hidden"><p className={compactLabel}>Qty</p><p className="mt-2 text-[11px] font-semibold">{item.qty}</p></div>
+                      <div className="compact-detail-stat"><p className={compactLabel}>Days Supply</p><p className="mt-2 text-[11px] font-semibold">{item.daysSupply}</p></div>
+                      <div className="compact-detail-stat"><p className={compactLabel}>Refills</p><p className="mt-2 text-[11px] font-semibold">{item.authRefills}</p></div>
+                      <div className="compact-detail-stat"><p className={compactLabel}>Qty</p><p className="mt-2 text-[11px] font-semibold">{item.qty}</p></div>
                       <p className="text-right text-[12px] font-bold text-[#161a18]">{item.price}</p>
                     </div>
                   </div>
@@ -4935,13 +5162,13 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
           </section>
         </div>
         <aside className="sticky top-6 space-y-6">
-          <div className="flex border-b border-[#d8ddd9] bg-white">
+          <ScrollableTabs className="order-detail-tabs flex border-b border-[#d8ddd9] bg-white" activeKey={detailSideTab} aria-label="Order details">
             {(["status", "receipt"] as const).map(tab => (
-              <button key={tab} onClick={() => setDetailSideTab(tab)} className={`relative h-12 flex-1 text-[12px] font-semibold transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full ${detailSideTab === tab ? "text-[#161a18] after:bg-[#183229]" : "text-[#667085] after:bg-transparent hover:text-[#161a18]"}`}>
+              <button data-active={detailSideTab === tab} key={tab} onClick={() => setDetailSideTab(tab)} className={`relative h-12 flex-1 text-[12px] font-semibold transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full ${detailSideTab === tab ? "text-[#161a18] after:bg-[#183229]" : "text-[#667085] after:bg-transparent hover:text-[#161a18]"}`}>
                 {tab === "status" ? "Order status" : "Receipt"}
               </button>
             ))}
-          </div>
+          </ScrollableTabs>
           {detailSideTab === "status" ? <>
             <section className="rounded-[14px] bg-[#FBFBFB] p-6">
               <h2 className="text-[18px] font-semibold text-[#161a18]">Order status</h2>
@@ -4988,28 +5215,30 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
       </div>
       </div>
       {paymentLinkModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-5 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setPaymentLinkModalOpen(false)} className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-5 backdrop-blur-[2px]" label="Order Detail">
           <button type="button" className="absolute inset-0 cursor-default" onClick={() => setPaymentLinkModalOpen(false)} aria-label="Close resend payment link" />
           <form onSubmit={event => { event.preventDefault(); setPaymentLinkModalOpen(false); setPaymentLinkSent(true); window.setTimeout(() => setPaymentLinkSent(false), 2200); }} className="relative z-10 w-full max-w-[440px] overflow-hidden rounded-[10px] bg-white shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
-            <div className="flex items-start justify-between border-b border-[#ececec] px-6 py-5">
+            <MobilePageHeader title="Resend payment link" onBack={() => setPaymentLinkModalOpen(false)} className="mobile-sheet-header" subtitle="We’ll send a secure payment link by SMS to the patient’s phone number."  />
+            <div className="max-lg:hidden flex items-start justify-between border-b border-[#ececec] px-6 py-5">
               <div><h2 className="text-[19px] font-semibold text-[#171717]">Resend payment link</h2><p className="mt-1.5 max-w-[330px] text-[12px] leading-5 text-[#667085]">We’ll send a secure payment link by SMS to the patient’s phone number.</p></div>
               <button type="button" onClick={() => setPaymentLinkModalOpen(false)} className="flex size-8 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close"><X size={18} /></button>
             </div>
             <div className="px-6 py-5">
-              <label className="block"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Phone number <span className="text-[#d92d20]">*</span></span><input required type="tel" value={paymentPhone} onChange={event => setPaymentPhone(event.target.value)} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] bg-white px-3.5 text-[12px] text-[#171717] outline-none focus:border-black" /></label>
+              <label className="block"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Phone number <span className="text-[#d92d20]">*</span></span><input {...inputMetadata("Phone number")} required type="tel" value={paymentPhone} onChange={event => setPaymentPhone(event.target.value)} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] bg-white px-3.5 text-[12px] text-[#171717] outline-none focus:border-black" /></label>
             </div>
             <div className="flex justify-end gap-2 border-t border-[#ececec] px-6 py-4">
               <button type="button" onClick={() => setPaymentLinkModalOpen(false)} className="h-[35px] rounded-full border border-[#d8d8d8] bg-white px-5 text-[11px] font-medium text-black transition-colors hover:bg-[#f1f1f1]">Cancel</button>
               <button type="submit" className="h-[35px] rounded-full bg-black px-6 text-[11px] font-semibold text-white transition-colors hover:bg-[#242424]">Send link</button>
             </div>
           </form>
-        </div>
+        </ModalLayer>
       )}
       {cancellationModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-5 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setCancellationModalOpen(false)} className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-5 backdrop-blur-[2px]" label="Order Detail">
           <button type="button" className="absolute inset-0 cursor-default" onClick={() => setCancellationModalOpen(false)} aria-label="Close cancellation request" />
           <form onSubmit={event => { event.preventDefault(); if (!cancellationReason.trim()) return; setCancellationModalOpen(false); setCancellationReason(""); }} className="relative z-10 w-full max-w-[500px] overflow-hidden rounded-[10px] bg-white shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
-            <div className="flex items-start justify-between border-b border-[#ececec] px-6 py-5">
+            <MobilePageHeader title="Request order cancellation" onBack={() => setCancellationModalOpen(false)} className="mobile-sheet-header" subtitle="Please provide a reason for requesting cancellation of this order."  />
+            <div className="max-lg:hidden flex items-start justify-between border-b border-[#ececec] px-6 py-5">
               <div><h2 className="text-[19px] font-semibold text-[#171717]">Request order cancellation</h2><p className="mt-1.5 max-w-[380px] text-[12px] leading-5 text-[#667085]">Please provide a reason for requesting cancellation of this order.</p></div>
               <button type="button" onClick={() => setCancellationModalOpen(false)} className="flex size-8 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close"><X size={18} /></button>
             </div>
@@ -5021,7 +5250,7 @@ function OrderDetailPage({ order, onNavigate }: { order: typeof ORDERS[number]; 
               <button type="submit" disabled={!cancellationReason.trim()} className="h-[35px] rounded-full px-5 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-[#ededed] disabled:text-[#999] enabled:bg-[#D92D20] enabled:text-white enabled:hover:bg-[#b42318]">Request cancellation</button>
             </div>
           </form>
-        </div>
+        </ModalLayer>
       )}
       <SupportCreateTicketModal open={createTicketModalOpen} onClose={() => setCreateTicketModalOpen(false)} onCreate={() => setCreateTicketModalOpen(false)} />
     </>
@@ -5269,7 +5498,7 @@ function OrderHistoryDateInput({ label, value, onChange, min, max }: { label: st
     <div className="flex w-full flex-col">
       <label className="mb-1.5 block text-[11px] font-medium leading-none text-[#667085]">{label}</label>
       <div className="relative flex w-full items-center">
-        <input
+        <input {...inputMetadata(label)}
           type="text"
           value={displayValue}
           onChange={handleTextChange}
@@ -5284,7 +5513,7 @@ function OrderHistoryDateInput({ label, value, onChange, min, max }: { label: st
             <path d="M15.6947 13.7H15.7037M15.6947 16.7H15.7037M11.9955 13.7H12.0045M11.9955 16.7H12.0045M8.29431 13.7H8.30329M8.29431 16.7H8.30329" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <input
+        <input {...inputMetadata(label)}
           type="date"
           value={value}
           onChange={event => event.target.value && onChange(event.target.value)}
@@ -5366,7 +5595,30 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
   return (
     <>
-      <div className="mb-5 flex flex-col items-start gap-3">
+      <MobilePageHeader title="Order History" subtitle={`${orders.length} orders`} search={{ value: search, onChange: setSearch, placeholder: "Search order history", clearable: true }}><div className="ml-auto flex flex-wrap items-end justify-end gap-3.5">
+            <div className="w-[180px] max-w-full">
+              <OrderHistorySelect label="Period" options={ORDER_HISTORY_RANGE_PRESETS} value={rangePreset} onChange={setRangePreset} />
+            </div>
+            {rangePreset === "custom" && (
+              <>
+                <div className="w-[180px] max-w-full">
+                  <OrderHistoryDateInput label="From" value={customStart} onChange={setCustomStart} max={customEnd || undefined} />
+                </div>
+                <div className="w-[180px] max-w-full">
+                  <OrderHistoryDateInput label="To" value={customEnd} onChange={setCustomEnd} min={customStart || undefined} />
+                </div>
+              </>
+            )}
+            <div className="w-[180px] max-w-full">
+              <OrderHistorySelect label="Paid by" options={ORDER_HISTORY_PAYER_OPTIONS} value={payer} onChange={setPayer} />
+            </div>
+            {historyVersion === "v2" && (
+              <div className="w-[180px] max-w-full">
+                <OrderHistorySelect label="Status" options={ORDER_HISTORY_STATUS_OPTIONS} value={status} onChange={setStatus} />
+              </div>
+            )}
+          </div></MobilePageHeader>
+      <div className="max-lg:hidden mb-5 flex flex-col items-start gap-3">
         <div className="flex w-full items-center justify-between gap-4">
           <h1 className="flex h-[38px] items-center text-[28px] font-semibold leading-tight text-[#1a1a1a]">
             Order History <span className="text-[16px] font-normal text-[#9d9d9d]">({orders.length})</span>
@@ -5376,27 +5628,27 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <div className={`group mt-[17px] flex h-[38px] w-full items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 focus-within:border-black ${historyVersion === "v2" ? "sm:w-[280px]" : "transition-all duration-300 ease-out sm:w-[220px] sm:focus-within:w-[310px]"}`}>
             <Search size={14} strokeWidth={1.8} className={`shrink-0 text-[#686868] ${historyVersion === "current" ? "transition-transform duration-300 group-focus-within:scale-110" : ""}`} />
             <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search order history" className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:font-medium placeholder:text-[#686868]" />
-            {search ? <button type="button" onClick={() => setSearch("")} className="text-[14px] text-[#777] hover:text-black" aria-label="Clear search">×</button> : <span className="shrink-0 text-[10px] text-[#686868]">⌘ F</span>}
+            {search ? <button type="button" onClick={() => setSearch("")} className="text-[14px] text-[#777] hover:text-black" aria-label="Clear search">×</button> : <span className="search-shortcut shrink-0 text-[10px] text-[#686868]">⌘ F</span>}
           </div>
           <div className="ml-auto flex flex-wrap items-end justify-end gap-3.5">
-            <div className="w-[180px]">
+            <div className="w-[180px] max-w-full">
               <OrderHistorySelect label="Period" options={ORDER_HISTORY_RANGE_PRESETS} value={rangePreset} onChange={setRangePreset} />
             </div>
             {rangePreset === "custom" && (
               <>
-                <div className="w-[180px]">
+                <div className="w-[180px] max-w-full">
                   <OrderHistoryDateInput label="From" value={customStart} onChange={setCustomStart} max={customEnd || undefined} />
                 </div>
-                <div className="w-[180px]">
+                <div className="w-[180px] max-w-full">
                   <OrderHistoryDateInput label="To" value={customEnd} onChange={setCustomEnd} min={customStart || undefined} />
                 </div>
               </>
             )}
-            <div className="w-[180px]">
+            <div className="w-[180px] max-w-full">
               <OrderHistorySelect label="Paid by" options={ORDER_HISTORY_PAYER_OPTIONS} value={payer} onChange={setPayer} />
             </div>
             {historyVersion === "v2" && (
-              <div className="w-[180px]">
+              <div className="w-[180px] max-w-full">
                 <OrderHistorySelect label="Status" options={ORDER_HISTORY_STATUS_OPTIONS} value={status} onChange={setStatus} />
               </div>
             )}
@@ -5425,8 +5677,7 @@ function OrderHistoryPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
           </div>
         ) : (
           <div className="rounded-xl bg-white">
-            <div className="w-full max-w-[1400px] overflow-x-auto bg-white">
-              <table className={`w-full min-w-max text-left text-sm ${historyVersion === "v2" ? "border-separate border-spacing-0" : "border-collapse"}`}>
+            <div className="table-scroll w-full max-w-[1400px] overflow-x-auto bg-white" tabIndex={0} role="region" aria-label="Scrollable table — swipe or scroll horizontally"><p className="table-scroll-hint">Swipe to see all columns <span aria-hidden="true">↔</span></p><table className={`w-full min-w-max text-left text-sm ${historyVersion === "v2" ? "border-separate border-spacing-0" : "border-collapse"}`}>
                 <thead>
                   <tr>
                     {(historyVersion === "v2" ? ["Patient", "Date", "Type", "Status", "Paid By", "Total", ""] : ["Date", "Order", "Patient", "Type", "Status", "Paid By", "Total", "Refunded", "Paid", ""]).map((header, index) => (
@@ -5705,9 +5956,10 @@ function PendingV2ShipToChip({ shipTo, items }: { shipTo: "patient" | "clinic"; 
 function PendingApprovalModal({ isOpen, onClose, onApprove, isLoading }: { isOpen: boolean; onClose: () => void; onApprove: () => void; isLoading: boolean }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <ModalLayer onClose={onClose} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50" label="Pending Approval">
       <div className="max-h-[90vh] w-full max-w-[480px] overflow-y-auto rounded-2xl bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]" onClick={event => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-5">
+        <MobilePageHeader title="Approve Order" onBack={onClose} className="mobile-sheet-header"  />
+            <div className="max-lg:hidden flex items-center justify-between border-b border-[#e5e7eb] px-6 py-5">
           <h2 className="text-[18px] font-semibold text-[#111827]">Approve Order</h2>
           <button className="text-2xl leading-none text-[#6b7280] hover:text-[#374151]" onClick={onClose}>×</button>
         </div>
@@ -5755,7 +6007,7 @@ function PendingApprovalModal({ isOpen, onClose, onApprove, isLoading }: { isOpe
           </button>
         </div>
       </div>
-    </div>
+    </ModalLayer>
   );
 }
 
@@ -5769,9 +6021,10 @@ function PendingRejectModal({ isOpen, onClose, onReject, isLoading }: { isOpen: 
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50" onClick={handleClose}>
+    <ModalLayer onClose={handleClose} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50" label="Pending Reject">
       <div className="max-h-[90vh] w-full max-w-[440px] overflow-y-auto rounded-2xl bg-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]" onClick={event => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-[#e5e7eb] px-6 py-5">
+        <MobilePageHeader title="Reject Order" onBack={handleClose} className="mobile-sheet-header"  />
+            <div className="max-lg:hidden flex items-center justify-between border-b border-[#e5e7eb] px-6 py-5">
           <h2 className="text-[18px] font-semibold text-[#111827]">Reject Order</h2>
           <button className="text-2xl leading-none text-[#6b7280] hover:text-[#374151]" onClick={handleClose}>×</button>
         </div>
@@ -5802,7 +6055,7 @@ function PendingRejectModal({ isOpen, onClose, onReject, isLoading }: { isOpen: 
           </button>
         </div>
       </div>
-    </div>
+    </ModalLayer>
   );
 }
 
@@ -5847,7 +6100,11 @@ function PendingApprovalDetail({ approval, onBack, onResolve }: { approval: Pend
   return (
     <div className="max-w-[1040px]">
       {/* Top bar */}
-      <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 ${detailVersion === "v2" ? "sticky top-0 z-20 border-b border-[#eeeeec] bg-white/95 py-3 backdrop-blur-sm" : ""}`}>
+      <MobilePageHeader title={`Order #${approval.id.slice(-6).toUpperCase()}`} onBack={onBack} subtitle="Review order" actions={<>
+        <MobileHeaderAction aria-label="Reject order" onClick={() => setIsRejectModalOpen(true)}><X size={20} /></MobileHeaderAction>
+        <MobileHeaderAction aria-label="Approve Order" onClick={() => setIsApprovalModalOpen(true)}><Check size={20} /></MobileHeaderAction>
+      </>} />
+      <div className={`max-lg:hidden mb-5 flex flex-wrap items-center justify-between gap-3 ${detailVersion === "v2" ? "sticky top-0 z-20 border-b border-[#eeeeec] bg-white/95 py-3 backdrop-blur-sm" : ""}`}>
         <div className="flex items-center gap-3">
           <button type="button" aria-label="Back to pending approvals" onClick={onBack} className="flex size-10 items-center justify-center rounded-r-[12px] bg-[#f0f1f2] text-[#111] transition-colors hover:bg-[#e6e8e9]">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
@@ -5951,7 +6208,7 @@ function PendingApprovalDetail({ approval, onBack, onResolve }: { approval: Pend
                     <p className="mt-0.5 text-[11px] text-[#667085]">Licensed compounding pharmacy</p>
                   </div>
                 </div>
-                <p className="min-w-0 flex-1 whitespace-nowrap text-center text-[10px] font-medium text-[#b42318]">Please make sure to also forward an e-prescription via your clinical software to the above pharmacy!</p>
+                <p className="min-w-0 basis-full md:basis-auto flex-1 text-center text-[10px] font-medium text-[#b42318]">Please make sure to also forward an e-prescription via your clinical software to the above pharmacy!</p>
                 <p className="text-[16px] font-bold text-[#161a18]">${pharmacyTotal.toFixed(2)}</p>
               </div>
 
@@ -5994,7 +6251,7 @@ function PendingApprovalDetail({ approval, onBack, onResolve }: { approval: Pend
                       <div className={`grid gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_70px_70px_70px_90px] ${rxIndex > 0 ? "border-t border-[#eceeeb]" : ""}`}>
                         <div className="flex gap-3">
                           <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[7px] border border-[#eeeeec] bg-white">
-                            <img src={rx.image} alt="" className="size-11 object-contain mix-blend-multiply" />
+                            <img decoding="async" loading="lazy" src={rx.image} alt="" className="size-11 object-contain mix-blend-multiply" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
@@ -6006,15 +6263,15 @@ function PendingApprovalDetail({ approval, onBack, onResolve }: { approval: Pend
                             {rx.note && <p className="mt-1 text-[10px] text-[#161a18]"><strong>Note:</strong> {rx.note}</p>}
                           </div>
                         </div>
-                        <div className="max-md:hidden">
+                        <div className="compact-detail-stat">
                           <p className={metaLabel}>Days Supply</p>
                           <p className="mt-2 text-[11px] font-semibold text-[#161a18]">{rx.daysSupply}</p>
                         </div>
-                        <div className="max-md:hidden">
+                        <div className="compact-detail-stat">
                           <p className={metaLabel}>Refills</p>
                           <p className="mt-2 text-[11px] font-semibold text-[#161a18]">{rx.refills}</p>
                         </div>
-                        <div className="max-md:hidden">
+                        <div className="compact-detail-stat">
                           <p className={metaLabel}>Qty</p>
                           <p className="mt-2 text-[11px] font-semibold text-[#161a18]">{rx.qty}</p>
                         </div>
@@ -6051,6 +6308,7 @@ function PendingApprovalDetail({ approval, onBack, onResolve }: { approval: Pend
 }
 
 function PendingApprovalsPage({ onNavigate: _onNavigate }: { onNavigate: (p: Page) => void }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
   const [approvals, setApprovals] = useState<PendingApproval[]>(PENDING_APPROVALS_MOCK);
   const [searchQuery, setSearchQuery] = useState("");
   const [approvalsVersion, setApprovalsVersion] = useState<"current" | "v2" | "v3">("v2");
@@ -6100,7 +6358,8 @@ function PendingApprovalsPage({ onNavigate: _onNavigate }: { onNavigate: (p: Pag
 
   return (
     <div className="max-w-[1400px]">
-      <div className="mb-5 flex flex-col gap-3">
+      <MobilePageHeader title="Pending Approvals" subtitle={`${approvals.length} orders`} search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search by order, patient, or user", label: "Search pending approvals", inputRef: searchInputRef }} />
+      <div className="max-lg:hidden mb-5 flex flex-col gap-3">
         <div className="flex flex-col items-start gap-3">
           <div className="flex w-full items-center justify-between gap-4">
             <h1 className="flex h-[38px] items-center text-[28px] font-medium leading-tight text-[#1a1a1a]">
@@ -6113,14 +6372,14 @@ function PendingApprovalsPage({ onNavigate: _onNavigate }: { onNavigate: (p: Pag
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
               </span>
               <input
-                ref={searchInputRef}
+                ref={compactNavigation ? undefined : searchInputRef}
                 value={searchQuery}
                 onChange={event => setSearchQuery(event.target.value)}
                 placeholder="Search by order, patient, or user"
                 aria-label="Search pending approvals"
                 className={`min-w-0 flex-1 bg-transparent text-[11px] text-[#1a1a1a] outline-none placeholder:text-[#686868] ${approvalsVersion !== "current" ? "font-normal placeholder:font-normal" : "font-medium placeholder:font-medium"}`}
               />
-              <span className="shrink-0 text-[10px] text-[#686868]">⌘ F</span>
+              <span className="search-shortcut shrink-0 text-[10px] text-[#686868]">⌘ F</span>
             </label>
             {approvalsVersion === "v2" && <span className="pb-2 text-[11px] font-medium text-[#7f1d1d]">{filteredApprovals.length} requiring review</span>}
           </div>
@@ -6152,7 +6411,7 @@ function PendingApprovalsPage({ onNavigate: _onNavigate }: { onNavigate: (p: Pag
               </div>
               <span className="text-[10px] font-medium text-[#777]">Oldest submissions first</span>
             </div>
-            <div className="mt-3 hidden grid-cols-[minmax(250px,1.25fr)_minmax(150px,.75fr)_minmax(170px,.8fr)_minmax(150px,.75fr)_150px] gap-4 px-4 py-2 text-[10px] font-normal text-[#999] md:grid">
+            <div className="mt-3 hidden grid-cols-[minmax(0,1.25fr)_minmax(0,.75fr)_minmax(0,.8fr)_minmax(0,.75fr)_150px] gap-4 px-4 py-2 text-[10px] font-normal text-[#999] xl:grid">
               <span>Order and patient</span><span>Created by</span><span>Payment</span><span>Shipping</span><span className="text-right">Total</span>
             </div>
             <div className="space-y-1">
@@ -6160,7 +6419,7 @@ function PendingApprovalsPage({ onNavigate: _onNavigate }: { onNavigate: (p: Pag
                 const created = new Date(approval.createdAt);
                 const isPaid = approval.paymentMethod === "clinic_ach";
                 return (
-                  <article key={approval.id} onClick={() => setSelectedId(approval.id)} className="group grid cursor-pointer gap-4 rounded-[10px] px-4 py-3.5 transition-colors odd:bg-white even:bg-[#fafafa] hover:bg-[#f1f1f1] md:grid-cols-[minmax(250px,1.25fr)_minmax(150px,.75fr)_minmax(170px,.8fr)_minmax(150px,.75fr)_150px] md:items-center">
+                  <article key={approval.id} onClick={() => setSelectedId(approval.id)} className="group grid cursor-pointer gap-4 rounded-[10px] px-4 py-3.5 transition-colors odd:bg-white even:bg-[#fafafa] hover:bg-[#f1f1f1] xl:grid-cols-[minmax(0,1.25fr)_minmax(0,.75fr)_minmax(0,.8fr)_minmax(0,.75fr)_150px] md:items-center">
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2"><h3 className="truncate text-[12px] font-semibold text-[#161616]">{approval.patient.firstName} {approval.patient.lastName}</h3><span className="shrink-0 text-[10px] font-semibold text-[#B25327]">Pending Approval</span></div>
                       <p className="mt-1 text-[10px] text-[#777]">Order #{approval.id.slice(-8)}</p>
@@ -6180,8 +6439,7 @@ function PendingApprovalsPage({ onNavigate: _onNavigate }: { onNavigate: (p: Pag
             </div>
           </div>
         ) : (
-          <div className="w-full max-w-[1400px] overflow-x-auto bg-white">
-            <table className={`w-full min-w-max text-left text-sm ${approvalsVersion === "v2" ? "table-fixed border-separate border-spacing-0" : "border-collapse"}`}>
+          <div className="table-scroll w-full max-w-[1400px] overflow-x-auto bg-white" tabIndex={0} role="region" aria-label="Scrollable table — swipe or scroll horizontally"><p className="table-scroll-hint">Swipe to see all columns <span aria-hidden="true">↔</span></p><table className={`w-full min-w-max text-left text-sm ${approvalsVersion === "v2" ? "table-fixed border-separate border-spacing-0" : "border-collapse"}`}>
               {approvalsVersion === "v2" && <colgroup><col className="w-[18%]" /><col className="w-[17%]" /><col className="w-[18%]" /><col className="w-[21%]" /><col className="w-[12%]" /><col className="w-[7%]" /><col className="w-[7%]" /></colgroup>}
               <thead>
                 <tr>
@@ -6281,7 +6539,7 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
 
   const Brand = () => (
     <button type="button" onClick={onClose} className="flex min-h-11 items-center gap-2.5" aria-label="Return to business selection">
-      <img src={scriptlinkrxLogo} alt="" className="h-8 w-8 object-contain" />
+      <img decoding="async" src={scriptlinkrxLogo} alt="" className="h-8 w-8 object-contain" />
       <span className="font-['Poppins',sans-serif] text-[17px] font-semibold tracking-[-0.02em] text-black">ScriptLinkRx</span>
     </button>
   );
@@ -6336,7 +6594,7 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
   return (
     <div className={`business-checkout checkout-step-${step} fixed inset-0 z-[100] overflow-y-auto bg-[radial-gradient(circle_at_50%_0%,rgba(219,232,255,0.95),rgba(237,244,255,0.65)_36%,#f7f8fa_76%)] text-[#171717]`}>
       <style>{`
-        .business-checkout h1::after {
+        .business-checkout h1:not(.mobile-page-title)::after {
           display: block;
           margin-top: 9px;
           color: #2563eb;
@@ -6345,10 +6603,10 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
           line-height: 16px;
           letter-spacing: .01em;
         }
-        .business-checkout.checkout-step-birthday h1::after { content: "Step 1 of 4 · Identity verification"; }
-        .business-checkout.checkout-step-details h1::after { content: "Step 2 of 4 · Review prescription"; }
-        .business-checkout.checkout-step-payment h1::after { content: "Step 3 of 4 · Secure payment"; }
-        .business-checkout.checkout-step-success h1::after { display: none; }
+        .business-checkout.checkout-step-birthday h1:not(.mobile-page-title)::after { content: "Step 1 of 4 · Identity verification"; }
+        .business-checkout.checkout-step-details h1:not(.mobile-page-title)::after { content: "Step 2 of 4 · Review prescription"; }
+        .business-checkout.checkout-step-payment h1:not(.mobile-page-title)::after { content: "Step 3 of 4 · Secure payment"; }
+        .business-checkout.checkout-step-success h1:not(.mobile-page-title)::after { display: none; }
         .business-checkout.checkout-step-birthday main > section > span:first-child { display: none; }
         @keyframes checkout-celebration-pop {
           0% { opacity: 0; transform: scale(.25) rotate(-20deg) translateY(8px); }
@@ -6405,21 +6663,22 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
           .business-checkout main > section { width: 100%; }
           .business-checkout input { font-size: 16px !important; }
           .business-checkout input[type="radio"] { width: 18px; height: 18px; }
-          .business-checkout h1 { font-size: 25px !important; line-height: 1.15; }
+          .business-checkout h1:not(.mobile-page-title) { font-size: 25px !important; line-height: 1.15; }
           .business-checkout.checkout-step-payment main > section { display: flex; flex-direction: column; }
           .business-checkout.checkout-step-payment main > section > div,
           .business-checkout.checkout-step-payment main > section > aside { width: 100%; }
         }
       `}</style>
       <main className="mx-auto flex min-h-screen w-full max-w-[400px] flex-col justify-center px-4 py-8 sm:py-12">
-        <div className="mb-6 flex justify-center sm:mb-8"><Brand /></div>
-        {step === "birthday" && <section className="mx-auto max-w-[520px] rounded-[18px] border border-[#dedede] bg-white p-6 shadow-[0_18px_50px_rgba(0,0,0,0.07)] sm:p-9"><span className="flex size-11 items-center justify-center rounded-full bg-[#eeeeee] text-black"><Shield size={20} /></span><h1 className="mt-5 text-[28px] font-semibold tracking-[-0.04em]">Verify your birthday</h1><p className="mt-2 text-[13px] leading-5 text-[#6f7782]">Enter the patient date of birth to securely view the prescription from {pharmacy.name}.</p><form onSubmit={event => { event.preventDefault(); if (birthday) setStep("details"); }} className="mt-7"><label className="text-[12px] font-semibold">Date of birth<input required type="date" value={birthday} onChange={event => setBirthday(event.target.value)} className={fieldClass} /></label><button className="mt-5 h-12 w-full rounded-full bg-black text-[13px] font-semibold text-white transition-colors hover:bg-[#252525]">Continue securely</button></form><p className="mt-5 flex items-center justify-center gap-1.5 text-[10px] text-[#8a8a8a]"><Lock size={11} /> Your information is encrypted and protected.</p></section>}
+        <div className="max-lg:hidden mb-6 flex justify-center sm:mb-8"><Brand /></div>
+        <MobilePageHeader subtitle={step === "birthday" ? "Step 1 of 4 · Identity verification" : step === "details" ? "Step 2 of 4 · Review prescription" : step === "payment" ? "Step 3 of 4 · Secure payment" : undefined} title={step === "birthday" ? "Verify your birthday" : step === "details" ? "Review your order" : step === "payment" ? "Payment details" : "Payment authorized"} onBack={step === "birthday" ? onClose : step === "details" ? () => setStep("birthday") : step === "payment" ? () => setStep("details") : onGoHome} />
+        {step === "birthday" && <section className="mx-auto max-w-[520px] rounded-[18px] border border-[#dedede] bg-white p-6 shadow-[0_18px_50px_rgba(0,0,0,0.07)] sm:p-9"><span className="flex size-11 items-center justify-center rounded-full bg-[#eeeeee] text-black"><Shield size={20} /></span><h1 className="hidden lg:block mt-5 text-[28px] font-semibold tracking-[-0.04em]">Verify your birthday</h1><p className="mt-2 text-[13px] leading-5 text-[#6f7782]">Enter the patient date of birth to securely view the prescription from {pharmacy.name}.</p><form onSubmit={event => { event.preventDefault(); if (birthday) setStep("details"); }} className="mt-7"><label className="text-[12px] font-semibold">Date of birth<input autoComplete="bday" required type="date" value={birthday} onChange={event => setBirthday(event.target.value)} className={fieldClass} /></label><button className="mt-5 h-12 w-full rounded-full bg-black text-[13px] font-semibold text-white transition-colors hover:bg-[#252525]">Continue securely</button></form><p className="mt-5 flex items-center justify-center gap-1.5 text-[10px] text-[#8a8a8a]"><Lock size={11} /> Your information is encrypted and protected.</p></section>}
 
         {step === "details" && (
           <section className="mx-auto w-full max-w-[540px] rounded-[18px] border border-[#dedede] bg-white px-5 py-7 shadow-[0_18px_55px_rgba(0,0,0,0.06)] sm:px-9 sm:py-9">
             <header className="max-w-[520px] text-left">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8a8a8a]">Prescription details</p>
-              <h1 className="mt-3 text-[27px] font-semibold tracking-[-0.04em]">Review your order</h1>
+              <h1 className="hidden lg:block mt-3 text-[27px] font-semibold tracking-[-0.04em]">Review your order</h1>
               <p className="mt-3 text-[13px] font-medium text-[#292929]">Hi Robert,</p>
               <p className="mt-2 text-[12px] leading-5 text-[#6f7782]">Please review your pharmacy, shipping, prescription, and pricing details below before continuing to payment.</p>
             </header>
@@ -6458,14 +6717,14 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
           <section className="mx-auto flex w-full max-w-[540px] flex-col gap-5">
             <div className="rounded-[18px] border border-[#dedede] bg-white p-5 sm:p-7">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#777]">Secure checkout</p>
-              <h1 className="mt-3 text-[27px] font-semibold tracking-[-0.04em]">Payment details</h1>
+              <h1 className="hidden lg:block mt-3 text-[27px] font-semibold tracking-[-0.04em]">Payment details</h1>
 
               <div className="mt-7 space-y-4">
-                <label className="block text-[12px] font-semibold">Cardholder name *<input required placeholder="Robert Johnson" className={fieldClass} /></label>
-                <label className="block text-[12px] font-semibold">Card number *<div className="relative"><input required inputMode="numeric" placeholder="1234 5678 9012 3456" className={`${fieldClass} pr-11`} /><CreditCard className="absolute bottom-3.5 right-3.5 text-[#777]" size={16} /></div></label>
+                <label className="block text-[12px] font-semibold">Cardholder name *<input {...inputMetadata("Cardholder name")} required placeholder="Robert Johnson" className={fieldClass} /></label>
+                <label className="block text-[12px] font-semibold">Card number *<div className="relative"><input {...inputMetadata("Card number")} required inputMode="numeric" placeholder="1234 5678 9012 3456" className={`${fieldClass} pr-11`} /><CreditCard className="absolute bottom-3.5 right-3.5 text-[#777]" size={16} /></div></label>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="text-[12px] font-semibold">Expiration *<input required placeholder="MM/YY" className={fieldClass} /></label>
-                  <label className="text-[12px] font-semibold">CVV *<input required inputMode="numeric" placeholder="123" className={fieldClass} /></label>
+                  <label className="text-[12px] font-semibold">Expiration *<input {...inputMetadata("MM/YY")} required placeholder="MM/YY" className={fieldClass} /></label>
+                  <label className="text-[12px] font-semibold">CVV *<input {...inputMetadata("CVV")} required inputMode="numeric" placeholder="123" className={fieldClass} /></label>
                 </div>
               </div>
 
@@ -6508,7 +6767,7 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
           <section className="mx-auto w-full max-w-[540px] rounded-[20px] border border-[#dedede] bg-white px-6 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.06)] sm:px-8 sm:py-9">
             <div className="text-center">
               <div className="mx-auto flex h-[92px] items-center justify-center" aria-hidden="true"><span className="checkout-celebration-emoji text-[64px] leading-none">🎉</span></div>
-              <h1 className="mt-5 text-[29px] font-semibold tracking-[-0.04em]">Payment authorized</h1>
+              <h1 className="hidden lg:block mt-5 text-[29px] font-semibold tracking-[-0.04em]">Payment authorized</h1>
               <p className="mx-auto mt-3 max-w-[470px] text-[14px] leading-6 text-[#4f5661]">Your order has been submitted to the pharmacy for processing. You will receive updates via SMS and email.</p>
             </div>
 
@@ -6530,16 +6789,16 @@ function PharmacyCheckout({ pharmacy, onClose, onGoHome }: { pharmacy: typeof PH
 function PharmaciesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   return (
     <>
-      <Header title="Pharmacies" onNavigate={onNavigate} />
+      <Header title="Pharmacies" onNavigate={onNavigate} mobileSearch={{ placeholder: "Search pharmacies..." }} mobileActions={<><MobileHeaderAction aria-label="Filter pharmacies"><Filter size={20} /></MobileHeaderAction><MobileHeaderAction aria-label="Add Pharmacy"><Plus size={20} /></MobileHeaderAction></>} />
 
-      <div className="flex items-center gap-3 mb-6">
-        <div className="group flex h-[38px] w-[220px] items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:w-[310px] focus-within:border-2 focus-within:border-black">
+      <div className="hidden lg:flex items-center gap-3 mb-6">
+        <div className="group flex h-[38px] w-[220px] max-w-full items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:w-[310px] focus-within:border-2 focus-within:border-black">
           <Search size={14} strokeWidth={1.8} className="shrink-0 text-[#686868] transition-transform duration-300 group-focus-within:scale-110" />
           <input
             className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:font-medium placeholder:text-[#686868]"
             placeholder="Search pharmacies..."
           />
-          <span className="shrink-0 text-[10px] text-[#686868]">⌘ F</span>
+          <span className="search-shortcut shrink-0 text-[10px] text-[#686868]">⌘ F</span>
         </div>
         <div className="ml-auto flex gap-2">
           <button className="flex items-center gap-1.5 border border-[#eaeaea] bg-card rounded-[8px] px-3 py-2 text-[12px] font-medium text-[#1a1a1a] hover:bg-[#f7efe9]/60 transition-colors">
@@ -6551,7 +6810,7 @@ function PharmaciesPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {PHARMACIES.map((ph) => (
           <div key={ph.name} className="rounded-xl border border-[#eaeaea] bg-card p-5">
             <div className="flex items-start justify-between mb-3">
@@ -6895,7 +7154,7 @@ function SupportTicketChat({ ticket, onClose, onSend }: { ticket: SupportTicket;
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: motionBehavior() });
   }, [ticket.messages.length]);
 
   function handleSend() {
@@ -6909,7 +7168,8 @@ function SupportTicketChat({ ticket, onClose, onSend }: { ticket: SupportTicket;
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-white">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-[#e6e7e4] bg-white px-4 py-3.5">
+      <MobilePageHeader title={ticket.description || `Ticket #${ticket.id.slice(0, 8)}`} onBack={onClose} subtitle={isResolved ? "Resolved" : "Open"} actions={<MobileHeaderAction aria-label={muted ? "Unmute notifications" : "Mute notifications"} aria-pressed={muted} onClick={() => setMuted(m => !m)}><Bell size={20} /></MobileHeaderAction>} className="mobile-chat-header" />
+      <div className="max-lg:hidden flex shrink-0 items-center gap-3 border-b border-[#e6e7e4] bg-white px-4 py-3.5">
         <button type="button" onClick={onClose} aria-label="Close chat" className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-full text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#0d0e0d]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -7086,9 +7346,10 @@ function SupportCreateTicketModal({ open, onClose, onCreate }: { open: boolean; 
   }
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <ModalLayer onClose={onClose} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px]" label="Create support ticket">
       <div className="max-h-[90vh] w-full max-w-[500px] overflow-y-auto rounded-[10px] border border-[#e5e5e5] bg-white p-7 shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
-        <div className="mb-6 flex items-start justify-between">
+        <MobilePageHeader title="Create Ticket" onBack={onClose} className="mobile-sheet-header mobile-sheet-inset" subtitle="Tell us what you need help with."  />
+            <div className="max-lg:hidden mb-6 flex items-start justify-between">
           <div><h2 className="text-[22px] font-semibold text-[#1a1a1a]">Create Ticket</h2><p className="mt-1 text-[12px] text-[#6f7782]">Tell us what you need help with.</p></div>
           <button type="button" onClick={onClose} className="flex size-9 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close"><X size={19} /></button>
         </div>
@@ -7096,7 +7357,7 @@ function SupportCreateTicketModal({ open, onClose, onCreate }: { open: boolean; 
           <div className="mb-8">
             <div className="mb-5">
               <label className="mb-2 block text-[14px] font-semibold leading-5 text-[#121212]">Type</label>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <ScrollableTabs activeKey={ticketType} desktopLayout="grid" className="mt-2 grid grid-cols-2 gap-2" aria-label="Ticket type">
                 {([["ticket", "Ticket"], ["feature_request", "Feature Request"]] as const).map(([value, label]) => (
                   <label key={value} className={`flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-3 transition-colors ${ticketType === value ? "border-black bg-[#f1f1f1]" : "border-[#dedede] bg-white hover:border-[#aaa]"}`}>
                     <input type="radio" name="ticket_type" value={value} checked={ticketType === value} onChange={() => setTicketType(value)} className="sr-only" />
@@ -7106,7 +7367,7 @@ function SupportCreateTicketModal({ open, onClose, onCreate }: { open: boolean; 
                     <span className="text-[14px] font-medium text-[#121212]">{label}</span>
                   </label>
                 ))}
-              </div>
+              </ScrollableTabs>
             </div>
             <div>
               <label htmlFor="support-ticket-description" className="mb-2 block text-[14px] font-semibold leading-5 text-[#121212]">
@@ -7130,7 +7391,7 @@ function SupportCreateTicketModal({ open, onClose, onCreate }: { open: boolean; 
           </div>
         </form>
       </div>
-    </div>
+    </ModalLayer>
   );
 }
 
@@ -7203,7 +7464,8 @@ function SupportPage({ onNavigate: _onNavigate }: { onNavigate: (p: Page) => voi
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      {!mobileShowDetail && <MobilePageHeader title="Support Tickets" subtitle={`${tabCounts.OPEN + tabCounts.CLOSED} tickets`} search={{ value: searchValue, onChange: setSearchValue, placeholder: "Search tickets" }} actions={<MobileHeaderAction aria-label="Create Ticket" onClick={() => setIsCreateModalOpen(true)}><Plus size={20} /></MobileHeaderAction>} />}
+      <div className="max-lg:hidden mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-semibold leading-tight text-[#1a1a1a]">
             Support Tickets <span className="ml-1 text-[16px] font-medium text-[#717680]">({tabCounts.OPEN + tabCounts.CLOSED})</span>
@@ -7222,14 +7484,14 @@ function SupportPage({ onNavigate: _onNavigate }: { onNavigate: (p: Page) => voi
         </div>
       </div>
 
-      <div className="flex h-[calc(100dvh-190px)] min-h-[480px] w-full overflow-hidden rounded-[14px] border border-[#e5e5e5] bg-white">
+      <div className="support-workspace flex h-[calc(100dvh-190px)] min-h-[360px] w-full overflow-hidden rounded-[14px] border border-[#e5e5e5] bg-white">
         {/* Left: ticket list */}
-        <aside className={`flex min-h-0 w-[360px] shrink-0 flex-col border-r border-[#e5e5e5] bg-[#FAFAFA] max-md:w-full max-md:border-r-0 ${mobileShowDetail ? "max-md:hidden" : ""}`}>
-          <div className="shrink-0 bg-[#FAFAFA] px-3.5 pb-2 pt-3.5">
+        <aside className={`flex min-h-0 w-full lg:w-[360px] max-w-full shrink-0 flex-col border-r border-[#e5e5e5] bg-[#FAFAFA] max-lg:border-r-0 ${mobileShowDetail ? "max-lg:hidden" : ""}`}>
+          <div className="max-lg:hidden shrink-0 bg-[#FAFAFA] px-3.5 pb-2 pt-3.5">
             <SupportSearchInput value={searchValue} onChange={setSearchValue} placeholder="Search tickets" />
           </div>
 
-          <div className="flex shrink-0 items-end gap-5 border-b border-[#e3e3e3] bg-[#FAFAFA] px-3" role="tablist" aria-label="Filter tickets by status">
+          <ScrollableTabs className="flex shrink-0 items-end gap-5 border-b border-[#e3e3e3] bg-[#FAFAFA] px-3" role="tablist" aria-label="Filter tickets by status" activeKey={activeTab}>
             {([["OPEN", "Open"], ["CLOSED", "Closed"]] as const).map(([id, label]) => {
               const isActive = activeTab === id;
               return (
@@ -7244,13 +7506,13 @@ function SupportPage({ onNavigate: _onNavigate }: { onNavigate: (p: Page) => voi
                   }`}
                 >
                   {label}
-                  <span className={`inline-flex h-4 min-w-[18px] items-center justify-center rounded-full px-[5px] text-[10px] font-bold ${isActive ? "bg-black text-white" : "bg-[#e5e7eb] text-[#4b5563]"}`}>
+                  <span className={`scrollable-tab-count inline-flex h-4 min-w-[18px] items-center justify-center rounded-full px-[5px] text-[10px] font-bold ${isActive ? "bg-black text-white" : "bg-[#e5e7eb] text-[#4b5563]"}`}>
                     {tabCounts[id]}
                   </span>
                 </button>
               );
             })}
-          </div>
+          </ScrollableTabs>
 
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2.5 pb-3 pt-2.5">
             {filteredTickets.length === 0 ? (
@@ -7269,7 +7531,7 @@ function SupportPage({ onNavigate: _onNavigate }: { onNavigate: (p: Page) => voi
         </aside>
 
         {/* Right: chat detail */}
-        <section className={`flex min-h-0 min-w-0 flex-1 flex-col bg-white max-md:hidden ${mobileShowDetail ? "max-md:flex" : ""}`}>
+        <section className={`flex min-h-0 min-w-0 flex-1 flex-col bg-white max-lg:hidden ${mobileShowDetail ? "max-lg:flex" : ""}`}>
           {selectedTicket ? (
             <SupportTicketChat key={selectedTicket.id} ticket={selectedTicket} onClose={() => setMobileShowDetail(false)} onSend={text => handleSendMessage(selectedTicket.id, text)} />
           ) : (
@@ -7341,34 +7603,35 @@ function PatientCreateModal({ open, onClose }: { open: boolean; onClose: () => v
     ["Allergies", "allergies", "Write...", false], ["Email", "email", "Write...", false],
   ] as const;
   return (
-    <div className="fixed inset-0 z-[80] flex justify-end bg-black/30 backdrop-blur-[2px]">
+    <ModalLayer onClose={onClose} className="fixed inset-0 z-[80] flex justify-end bg-black/30 backdrop-blur-[2px]" label="Patient Create">
       <button className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Close create patient" />
       <form onSubmit={event => { event.preventDefault(); onClose(); }} className="relative flex h-full w-full max-w-[680px] flex-col overflow-hidden rounded-l-[16px] border-l border-[#e4e1dd] bg-white shadow-[-18px_0_55px_rgba(0,0,0,0.16)]">
-        <div className="flex items-center justify-between border-b border-[#ece9e5] px-6 py-5">
+        <MobilePageHeader title="Create Patient" onBack={onClose} className="mobile-sheet-header" subtitle="Enter the patient’s personal and contact information."  />
+            <div className="max-lg:hidden flex items-center justify-between border-b border-[#ece9e5] px-6 py-5">
           <div><h2 className="text-[20px] font-semibold text-[#171717]">Create Patient</h2><p className="mt-1 text-[11px] text-[#777]">Enter the patient’s personal and contact information.</p></div>
           <button type="button" onClick={onClose} className="flex size-8 items-center justify-center rounded-full text-[#777] hover:bg-[#f4f2ef]" aria-label="Close"><X size={18} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
-            {fields.slice(0, 2).map(([label, name, placeholder, required]) => <label key={name} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input name={name} required={required} placeholder={placeholder} className={inputClass} /></label>)}
+            {fields.slice(0, 2).map(([label, name, placeholder, required]) => <label key={name} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input {...inputMetadata(String(name))} name={name} required={required} placeholder={placeholder} className={inputClass} /></label>)}
             <label className="block text-[11px] font-medium text-[#242424]">Gender <span className="text-[#b44b42]">*</span><select required defaultValue="" className={inputClass}><option value="" disabled>Select</option><option>Female</option><option>Male</option><option>Other</option></select></label>
-            <label className="block text-[11px] font-medium text-[#242424]">Birth Date <span className="text-[#b44b42]">*</span><input type="date" required className={inputClass} /></label>
-            {fields.slice(2, 6).map(([label, name, placeholder, required]) => <label key={name} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input name={name} required={required} type={name.toLowerCase().includes("phone") ? "tel" : "text"} placeholder={placeholder} className={inputClass} /></label>)}
+            <label className="block text-[11px] font-medium text-[#242424]">Birth Date <span className="text-[#b44b42]">*</span><input {...inputMetadata("Authorized Refills")} type="date" required className={inputClass} /></label>
+            {fields.slice(2, 6).map(([label, name, placeholder, required]) => <label key={name} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input {...inputMetadata(String(name))} name={name} required={required} type={name.toLowerCase().includes("phone") ? "tel" : "text"} placeholder={placeholder} className={inputClass} /></label>)}
             <label className="block text-[11px] font-medium text-[#242424]">State <span className="text-[#b44b42]">*</span><select required defaultValue="" className={inputClass}><option value="" disabled>Select a state</option><option>Florida</option><option>New York</option><option>Texas</option><option>California</option></select></label>
-            {fields.slice(6).map(([label, name, placeholder, required]) => <label key={name} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input name={name} required={required} type={name === "email" ? "email" : "text"} placeholder={placeholder} className={inputClass} /></label>)}
+            {fields.slice(6).map(([label, name, placeholder, required]) => <label key={name} className="block text-[11px] font-medium text-[#242424]">{label} {required && <span className="text-[#b44b42]">*</span>}<input {...inputMetadata(String(name))} name={name} required={required} type={name === "email" ? "email" : "text"} placeholder={placeholder} className={inputClass} /></label>)}
             <label className="block text-[11px] font-medium text-[#242424]">Language<select defaultValue="" className={inputClass}><option value="" disabled>Select</option><option>English</option><option>Spanish</option><option>Albanian</option></select></label>
           </div>
           <div className="mt-5 border-t border-[#ece9e5] pt-5">
             <h3 className="text-[12px] font-semibold text-[#242424]">BMI Classification</h3>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <label className="text-[11px] font-medium text-[#242424]">Weight<div className="mt-1.5 flex gap-2"><input type="number" min="0" placeholder="Write..." className={inputClass.replace("mt-1.5 ", "")} /><select className="h-10 w-20 rounded-[10px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>lb</option><option>kg</option></select></div></label>
-              <label className="text-[11px] font-medium text-[#242424]">Height<div className="mt-1.5 flex gap-2"><input type="number" min="0" placeholder="Write..." className={inputClass.replace("mt-1.5 ", "")} /><select className="h-10 w-20 rounded-[10px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>in</option><option>cm</option></select></div></label>
+              <label className="text-[11px] font-medium text-[#242424]">Weight<div className="mt-1.5 flex gap-2"><input type="number" inputMode="decimal" step="any" min="0" placeholder="Write..." className={inputClass.replace("mt-1.5 ", "")} /><select className="h-10 w-20 rounded-[10px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>lb</option><option>kg</option></select></div></label>
+              <label className="text-[11px] font-medium text-[#242424]">Height<div className="mt-1.5 flex gap-2"><input type="number" inputMode="decimal" step="any" min="0" placeholder="Write..." className={inputClass.replace("mt-1.5 ", "")} /><select className="h-10 w-20 rounded-[10px] border border-[#dddcd8] bg-white px-2 text-[12px]"><option>in</option><option>cm</option></select></div></label>
             </div>
           </div>
         </div>
         <div className="border-t border-[#ece9e5] px-6 py-4"><button type="submit" className="h-11 w-full rounded-full bg-[#111] px-6 text-[12px] font-semibold text-white transition-colors hover:bg-black">Save Patient</button></div>
       </form>
-    </div>
+    </ModalLayer>
   );
 }
 
@@ -7395,11 +7658,12 @@ function PatientDetailsView({ patient, onBack, onEdit }: { patient: typeof PATIE
   const prescriptionUnitPrice = (name: string) => name === "NAD+ Injection" ? 84.50 : name === "Tirzepatide/Pyridoxine (B6)" ? 125.43 : 35;
   return (
     <div className="max-w-[1180px]">
-      <div className="mb-5 flex items-center gap-3">
+      <MobilePageHeader title={`${patient.firstName} ${patient.lastName}`} onBack={onBack} subtitle={`${patient.gender} · Date of birth ${patient.birthDate}`} actions={<MobileHeaderAction aria-label="Edit patient" onClick={onEdit}><Edit3 size={20} /></MobileHeaderAction>} search={{ placeholder: "Search orders" }} />
+      <div className="max-lg:hidden mb-5 flex items-center gap-3">
         <PageBackButton onClick={onBack} label="Back to patients" />
         <h1 className="text-[22px] font-semibold text-[#1a1a1a]">Patients</h1>
       </div>
-      <section className="rounded-[14px] bg-[var(--app-soft)] px-6 py-5">
+      <section className="hidden lg:block rounded-[14px] bg-[var(--app-soft)] px-6 py-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-[22px] font-semibold text-[#171717]">{patient.firstName} {patient.lastName} <span className="text-[16px] font-semibold text-[#666]">({patient.gender})</span></h1>
@@ -7420,10 +7684,10 @@ function PatientDetailsView({ patient, onBack, onEdit }: { patient: typeof PATIE
 
 
       <section ref={ordersSectionRef} className="mt-4 scroll-mt-5 rounded-[14px] bg-[var(--app-soft)] p-5">
-        <div className="flex items-center justify-between"><div><h2 className="text-[16px] font-semibold text-[#202020]">Orders <span className="ml-1 text-[12px] font-normal text-[#999]">({orderedPrescriptions.length + 1})</span></h2><p className="mt-1 text-[10px] text-[#858585]">Prescription and order history</p></div><div className="group flex h-[38px] w-[220px] items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:w-[310px] focus-within:border-2 focus-within:border-black"><Search size={14} strokeWidth={1.8} className="shrink-0 text-[#686868] transition-transform duration-300 group-focus-within:scale-110" /><input placeholder="Search orders" className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:font-medium placeholder:text-[#686868]" /><span className="shrink-0 text-[10px] text-[#686868]">⌘ F</span></div></div>
-        {orderedPrescriptions.map((prescription, index) => <article key={`ordered-${prescription.medication}-${index}`} className="mt-3 flex flex-wrap items-center gap-4 rounded-[10px] bg-white px-4 py-4"><div className="flex size-12 items-center justify-center overflow-hidden"><img src={prescription.medication === "NAD+ Injection" ? imgNadInjection : imgAminoQuad} alt="" className="size-12 object-contain mix-blend-multiply" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[12px] font-semibold text-[#222]">{prescription.medication}</p><span className="rounded-full bg-gradient-to-r from-[#FFE2D2] to-[#FFF45C] px-2 py-1 text-[8px] font-bold text-[#56203B]">Pending approval</span></div><p className="mt-1 text-[10px] text-[#777]">Qty {prescription.qty} · {prescription.days} days · {prescription.refills} refills · {selectedPatientPharmacy}</p></div><p className="text-[13px] font-semibold">${(prescriptionUnitPrice(prescription.medication) * Number(prescription.qty)).toFixed(2)}</p></article>)}
+        <div className="flex items-center justify-between"><div><h2 className="text-[16px] font-semibold text-[#202020]">Orders <span className="ml-1 text-[12px] font-normal text-[#999]">({orderedPrescriptions.length + 1})</span></h2><p className="mt-1 text-[10px] text-[#858585]">Prescription and order history</p></div><div className="max-lg:hidden group flex h-[38px] w-[220px] max-w-full items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:w-[310px] focus-within:border-2 focus-within:border-black"><Search size={14} strokeWidth={1.8} className="shrink-0 text-[#686868] transition-transform duration-300 group-focus-within:scale-110" /><input placeholder="Search orders" className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:font-medium placeholder:text-[#686868]" /><span className="search-shortcut shrink-0 text-[10px] text-[#686868]">⌘ F</span></div></div>
+        {orderedPrescriptions.map((prescription, index) => <article key={`ordered-${prescription.medication}-${index}`} className="mt-3 flex flex-wrap items-center gap-4 rounded-[10px] bg-white px-4 py-4"><div className="flex size-12 items-center justify-center overflow-hidden"><img decoding="async" loading="lazy" src={prescription.medication === "NAD+ Injection" ? imgNadInjection : imgAminoQuad} alt="" className="size-12 object-contain mix-blend-multiply" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[12px] font-semibold text-[#222]">{prescription.medication}</p><span className="rounded-full bg-gradient-to-r from-[#FFE2D2] to-[#FFF45C] px-2 py-1 text-[8px] font-bold text-[#56203B]">Pending approval</span></div><p className="mt-1 text-[10px] text-[#777]">Qty {prescription.qty} · {prescription.days} days · {prescription.refills} refills · {selectedPatientPharmacy}</p></div><p className="text-[13px] font-semibold">${(prescriptionUnitPrice(prescription.medication) * Number(prescription.qty)).toFixed(2)}</p></article>)}
         <article className="mt-3 rounded-[10px] bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4"><div className="flex items-center gap-3"><div className="flex size-12 shrink-0 items-center justify-center overflow-hidden bg-white"><img src={imgNadInjection} alt="NAD+ Injection" className="size-12 object-contain mix-blend-multiply" /></div><div><div className="flex items-center gap-2"><p className="text-[12px] font-semibold text-[#222]">NAD+ Injection</p><span className="rounded-full bg-gradient-to-r from-[#FFE2D2] to-[#FFF45C] px-2 py-1 text-[8px] font-bold text-[#56203B]">Pending approval</span></div><p className="mt-1 text-[10px] text-[#777]">Order #449537 · Jul 13, 2026 · Qty 1</p></div></div><div className="flex items-center gap-5"><p className="text-[13px] font-semibold text-[#222]">$74.64</p><button onClick={() => setOrderDetailsOpen(current => !current)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#333] hover:underline">{orderDetailsOpen ? "Hide details" : "Show details"}<ChevronDown size={13} className={orderDetailsOpen ? "rotate-180" : ""} /></button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-4"><div className="flex items-center gap-3"><div className="flex size-12 shrink-0 items-center justify-center overflow-hidden bg-white"><img decoding="async" loading="lazy" src={imgNadInjection} alt="NAD+ Injection" className="size-12 object-contain mix-blend-multiply" /></div><div><div className="flex items-center gap-2"><p className="text-[12px] font-semibold text-[#222]">NAD+ Injection</p><span className="rounded-full bg-gradient-to-r from-[#FFE2D2] to-[#FFF45C] px-2 py-1 text-[8px] font-bold text-[#56203B]">Pending approval</span></div><p className="mt-1 text-[10px] text-[#777]">Order #449537 · Jul 13, 2026 · Qty 1</p></div></div><div className="flex items-center gap-5"><p className="text-[13px] font-semibold text-[#222]">$74.64</p><button onClick={() => setOrderDetailsOpen(current => !current)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#333] hover:underline">{orderDetailsOpen ? "Hide details" : "Show details"}<ChevronDown size={13} className={orderDetailsOpen ? "rotate-180" : ""} /></button></div></div>
           {orderDetailsOpen && <div className="mx-4 mb-4 grid gap-4 rounded-[9px] bg-[#FBFBFB] px-4 py-4 text-[11px] sm:grid-cols-4"><div><p className="text-[#888]">Patient</p><p className="mt-1 font-semibold">{patient.firstName} {patient.lastName}</p></div><div><p className="text-[#888]">Shipping</p><p className="mt-1 font-semibold">Ship to patient</p></div><div><p className="text-[#888]">Tracking</p><p className="mt-1 font-semibold">Not ready</p></div><div><p className="text-[#888]">Days supply / Refills</p><p className="mt-1 font-semibold">30 days · 0 refills</p></div></div>}
         </article>
       </section>
@@ -7478,7 +7742,11 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   return (
     <>
       <div className="max-w-[1400px]">
-        <div className="mb-5 flex flex-col gap-3">
+        <MobilePageHeader title="Patients" subtitle={`${patients.length} patients`} search={{ value: search, onChange: setSearch, placeholder: "Search patients" }} actions={<>
+          <MobileHeaderAction aria-label="Upload Patients"><Upload size={20} /></MobileHeaderAction>
+          <MobileHeaderAction aria-label="Create Patient" onClick={() => setCreatePatientOpen(true)}><Plus size={20} /></MobileHeaderAction>
+        </>} />
+      <div className="max-lg:hidden mb-5 flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="flex h-[38px] items-center text-[28px] font-semibold text-[#1a1a1a] leading-tight">
               Patients{" "}
@@ -7490,7 +7758,7 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             <div className="group mt-[17px] flex h-[38px] w-full items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:border-2 focus-within:border-black sm:w-[220px] sm:focus-within:w-[310px]">
               <Search size={14} strokeWidth={1.8} className="flex-shrink-0 text-[#686868] transition-transform duration-300 group-focus-within:scale-110" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:font-medium placeholder:text-[#686868]" placeholder="Search patients" />
-              <span className="shrink-0 text-[10px] text-[#686868]">⌘ F</span>
+              <span className="search-shortcut shrink-0 text-[10px] text-[#686868]">⌘ F</span>
             </div>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
               <button className="flex h-10 items-center gap-1.5 rounded-full border border-[#d8dedb] bg-white px-4 text-[12px] font-medium text-black transition-colors hover:bg-[#f7f8f7]">
@@ -7506,8 +7774,7 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-[12px] bg-[var(--app-soft)] p-2">
-          <table className="w-full min-w-[940px] overflow-hidden rounded-[9px] bg-white">
+        <div className="table-scroll overflow-x-auto rounded-[12px] bg-[var(--app-soft)] p-2" tabIndex={0} role="region" aria-label="Scrollable table — swipe or scroll horizontally"><p className="table-scroll-hint">Swipe to see all columns <span aria-hidden="true">↔</span></p><table className="w-full min-w-[940px] overflow-hidden rounded-[9px] bg-white">
             <thead>
               <tr className="bg-[#FBFBFB]">
                 {COLS.map((h) => (
@@ -7549,11 +7816,11 @@ function UsersPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   <td className="px-5 py-3.5"><DoseSpotStatusIndicator data={p} name={`${p.firstName} ${p.lastName}`} kind="patient" href={`#/patients/${patientIndex}`} /></td>
                   <td className="whitespace-nowrap px-5 py-3.5 text-[12px] font-normal text-[#4b4b4b]">{patientOrderCount(p)}</td>
                   <td onClick={event => event.stopPropagation()} className="relative px-4 py-3.5 text-right">
-                    <button onClick={() => setOpenPatientMenu(current => current === patientIndex ? null : patientIndex)} className={`flex size-7 items-center justify-center rounded-[7px] text-[#777] transition-all hover:bg-[#eceae7] hover:text-[#111] ${openPatientMenu === patientIndex ? "bg-[#eceae7] opacity-100" : "opacity-0 group-hover:opacity-100"}`} aria-label={`Actions for ${p.firstName} ${p.lastName}`}>
+                    <button onClick={() => setOpenPatientMenu(current => current === patientIndex ? null : patientIndex)} className={`flex size-7 items-center justify-center rounded-[7px] text-[#777] transition-all hover:bg-[#eceae7] hover:text-[#111] ${openPatientMenu === patientIndex ? "bg-[#eceae7] opacity-100" : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100"}`} aria-label={`Actions for ${p.firstName} ${p.lastName}`}>
                       <MoreHorizontal size={16} />
                     </button>
                     {openPatientMenu === patientIndex && (
-                      <div className="absolute right-2 top-10 z-30 w-[150px] overflow-hidden rounded-[9px] border border-[#e2dfdb] bg-white p-1.5 text-left shadow-[0_10px_30px_rgba(0,0,0,0.14)]">
+                      <div className="absolute right-2 top-10 z-30 w-[150px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[9px] border border-[#e2dfdb] bg-white p-1.5 text-left shadow-[0_10px_30px_rgba(0,0,0,0.14)]">
                         <button onClick={() => { setCreatePatientOpen(true); setOpenPatientMenu(null); }} className="flex h-8 w-full items-center gap-2 rounded-[6px] px-2.5 text-[11px] font-medium text-[#222] hover:bg-[#f4f2ef]"><Edit3 size={13} /> Edit</button>
                         <button onClick={() => setOpenPatientMenu(null)} className="flex h-8 w-full items-center gap-2 rounded-[6px] px-2.5 text-[11px] font-medium text-[#222] hover:bg-[#f4f2ef]"><RefreshCw size={13} /> DoseSpot Sync</button>
                         <button onClick={() => { setPatients(current => current.filter((_, index) => index !== patientIndex)); setOpenPatientMenu(null); }} className="flex h-8 w-full items-center gap-2 rounded-[6px] px-2.5 text-[11px] font-medium text-[#9f3f39] hover:bg-[#fbefee]"><Trash2 size={13} /> Delete</button>
@@ -7582,10 +7849,11 @@ function SettingsCenteredModal({ title, subtitle, submitLabel, onClose, onSubmit
     if (!isSubmitting) onClose();
   };
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/35 p-5 backdrop-blur-[3px]">
+    <ModalLayer onClose={handleClose} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/35 p-5 backdrop-blur-[3px]" label="Settings Centered">
       <button type="button" className="absolute inset-0 cursor-default" onClick={handleClose} aria-label="Close modal" tabIndex={-1} />
-      <form onSubmit={onSubmit} role="dialog" aria-modal="true" className="relative z-[1] flex max-h-[calc(100vh-40px)] w-full max-w-[500px] flex-col overflow-hidden rounded-[10px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(20,28,24,0.2)]">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#ececec] px-6 py-5">
+      <form onSubmit={onSubmit} className="relative z-[1] flex max-h-[calc(100vh-40px)] w-full max-w-[500px] flex-col overflow-hidden rounded-[10px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(20,28,24,0.2)]">
+        <MobilePageHeader title={title} onBack={handleClose} className="mobile-sheet-header" subtitle={subtitle}  />
+            <div className="max-lg:hidden flex shrink-0 items-start justify-between gap-3 border-b border-[#ececec] px-6 py-5">
           <div className="min-w-0">
             <h2 className="text-[20px] font-semibold text-[#171717]">{title}</h2>
             <p className="mt-1 text-[11px] text-[#777]">{subtitle}</p>
@@ -7601,7 +7869,7 @@ function SettingsCenteredModal({ title, subtitle, submitLabel, onClose, onSubmit
           </button>
         </div>
       </form>
-    </div>
+    </ModalLayer>
   );
 }
 
@@ -7631,7 +7899,7 @@ function SettingsChangeEmailModal({ isOpen, currentEmail, onClose, onSave, isSub
           <span className="mb-2 block text-[11px] font-medium text-[#292929]">
             New email address <span className="text-[#b4473d]">*</span>
           </span>
-          <input
+          <input {...inputMetadata("Authorized Refills")}
             autoFocus
             required
             type="email"
@@ -7697,7 +7965,7 @@ function SettingsChangePasswordModal({ isOpen, onClose, onSave, isSubmitting }: 
             <span className="mb-2 block text-[11px] font-medium text-[#292929]">
               {label} <span className="text-[#b4473d]">*</span>
             </span>
-            <input
+            <input {...inputMetadata(label)}
               autoFocus={index === 0}
               required
               minLength={index === 0 ? undefined : 6}
@@ -7716,6 +7984,7 @@ function SettingsChangePasswordModal({ isOpen, onClose, onSave, isSubmitting }: 
 }
 
 function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
   const shouldOpenPaymentSetup = () => window.sessionStorage.getItem("open-payment-setup") === "true";
   const shouldOpenPaymentOverview = () => window.sessionStorage.getItem("open-payment-overview") === "true";
   const [activeTab, setActiveTab] = useState(() => window.location.hash === "#/settings/prescribers" ? "Prescribers" : shouldOpenPaymentSetup() || shouldOpenPaymentOverview() ? "Pay by Clinic" : "Business Account");
@@ -7914,7 +8183,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         <span className="mb-1.5 block text-[11px] text-[#9d9d9d]">
           {label}{required && <span className="text-[#d92d20]">*</span>}
         </span>
-        <input
+        <input {...inputMetadata(label)}
           readOnly
           value={value}
           className="w-full rounded-[9px] border border-[#EAE8E1] bg-white px-3 py-2.5 text-[13px] text-[#1a1a1a] outline-none transition-colors focus:border-[#183229]"
@@ -7928,17 +8197,17 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
     const headers = type === "users"
       ? ["#", "Full Name", "User Phone", "User Email", "User Title", "Status", ""]
       : ["#", "Full Name", "Prescriber Phone", "Prescriber Email", "NPI Number", "DoseSpot / EPCS", "Status", ""];
-    const columns = type === "users" ? "grid-cols-[40px_1.25fr_1fr_1.55fr_1fr_92px_38px]" : "grid-cols-[32px_minmax(140px,1.25fr)_1fr_1.55fr_1fr_132px_80px_38px]";
+    const columns = type === "users" ? "40px minmax(0,1.25fr) minmax(0,1fr) minmax(0,1.55fr) minmax(0,1fr) 92px 44px" : "32px minmax(0,1.25fr) minmax(0,1fr) minmax(0,1.55fr) minmax(0,1fr) 132px 80px 44px";
     return (
-      <div className="rounded-[12px] bg-[#FBFBFB] p-2">
-        <div className={`grid ${columns} rounded-t-[9px] bg-[#FBFBFB] px-4 py-3`}>
+      <div style={{ "--settings-columns": columns } as CSSProperties} className="settings-data-table rounded-[12px] bg-[#FBFBFB] p-2">
+        <div className="settings-data-heading grid rounded-t-[9px] bg-[#FBFBFB] px-4 py-3">
           {headers.map(h => (
             <span key={h} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c8c]">{h}</span>
           ))}
         </div>
         {rows.map(({ cells: row, doseSpot }) => (
-          <div key={`${type}-${row[0]}`} className={`relative grid ${columns} items-center bg-white px-4 py-3.5 text-[12px] text-[#1a1a1a] transition-colors hover:bg-[var(--app-soft-hover)]`}>
-            {row.map((cell, index) => index === 1 ? <span key={cell} className="min-w-0 truncate font-semibold">{cell}</span> : <span key={`${index}-${cell}`} className={`min-w-0 truncate ${index === 0 ? "text-[#999]" : ""}`}>{cell}</span>)}
+          <div key={`${type}-${row[0]}`} className="settings-data-row relative grid items-center bg-white px-4 py-3.5 text-[12px] text-[#1a1a1a] transition-colors hover:bg-[var(--app-soft-hover)]">
+            {row.map((cell, index) => index === 1 ? <span key={cell} data-label={headers[index]} className="min-w-0 break-words font-semibold">{cell}</span> : <span key={`${index}-${cell}`} data-label={headers[index]} className={`min-w-0 break-words ${index === 0 ? "text-[#999]" : ""}`}>{cell}</span>)}
             {doseSpot && <div><DoseSpotStatusIndicator data={doseSpot} name={row[1]} kind="prescriber" /></div>}
             <span className="inline-flex w-fit rounded-full bg-[#ecf8ef] px-3 py-1.5 text-[10px] font-semibold text-[#31583F]">Active</span>
             <div className="relative">
@@ -7946,7 +8215,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                 <MoreHorizontal size={15} />
               </button>
               {type === "users" && openUserMenu === row[0] && (
-                <div data-row-menu className="absolute right-0 top-8 z-50 w-[190px] overflow-hidden rounded-[9px] border border-[#e2e2e2] bg-white py-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
+                <div data-row-menu className="absolute right-0 top-8 z-50 w-[190px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[9px] border border-[#e2e2e2] bg-white py-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
                   {[
                     { label: "Edit User", color: "text-[#555]" },
                     { label: "Change Email", color: "text-[#555]", action: () => setChangeEmailTarget({ name: row[1], email: row[3] }) },
@@ -7961,7 +8230,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                 </div>
               )}
               {type === "prescribers" && openPrescriberMenu === row[0] && (
-                <div data-row-menu className="absolute right-0 top-8 z-50 w-[190px] overflow-hidden rounded-[9px] border border-[#e2e2e2] bg-white py-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
+                <div data-row-menu className="absolute right-0 top-8 z-50 w-[190px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[9px] border border-[#e2e2e2] bg-white py-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
                   {[
                     { label: "Edit User", color: "text-[#555]" },
                     { label: "Change Email", color: "text-[#555]", action: () => setChangeEmailTarget({ name: row[1], email: row[3] }) },
@@ -7984,7 +8253,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
   return (
     <>
-      <Header title="Settings" onNavigate={onNavigate} />
+      <Header title="Settings" onNavigate={onNavigate} mobileSubtitle={activeTab} />
 
       <SettingsChangeEmailModal
         isOpen={!!changeEmailTarget}
@@ -8000,8 +8269,8 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         isSubmitting={passwordSaving}
       />
 
-      <div className="grid grid-cols-[220px_1fr] gap-6">
-        <nav className="flex flex-col gap-1">
+      <div className="settings-layout grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)] gap-6">
+        <ScrollableTabs as="nav" aria-label="Settings sections" className="settings-navigation flex gap-1 xl:flex-col" activeKey={activeTab} desktopLayout="column">
           {[
             { icon: Building2, label: "Business Account" },
             { icon: Users, label: "Users" },
@@ -8009,7 +8278,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             { icon: CreditCard, label: "Pay by Clinic" },
             { icon: CreditCard, label: "Payouts ACH" },
           ].map(({ icon: Icon, label }) => (
-            <button
+            <button data-active={activeTab === label}
               key={label}
               onClick={() => setActiveTab(label)}
               className={`flex items-center gap-2.5 rounded-[9px] px-3 py-2.5 text-left text-[12px] font-normal text-black transition-colors ${
@@ -8020,7 +8289,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <span className="min-w-0 flex-1">{label}</span>
             </button>
           ))}
-        </nav>
+        </ScrollableTabs>
 
         <div className="space-y-5">
           {activeTab === "Business Account" && (
@@ -8084,7 +8353,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   <h3 className="text-[13px] font-medium text-[#1a1a1a]">Default payment method</h3>
                   <p className="mt-1 text-[11px] text-[#737373]">Automatically selected for Pay by Clinic orders.</p>
                 </div>
-                <div className="relative w-[230px] max-sm:w-full">
+                <div className="relative w-[230px] max-w-full max-sm:w-full">
                   <select aria-label="Default payment method" value={primaryClinicPayment} onChange={event => setPrimaryClinicPayment(event.target.value as "credit" | "ach")} className="h-10 w-full appearance-none rounded-[10px] border border-[#cfd3d8] bg-white pl-4 pr-10 text-[11px] font-medium text-[#1a1a1a] outline-none transition-colors hover:border-[#98a2b3] focus:border-[#2563EB]">
                     <option value="credit">Credit Card</option>
                     <option value="ach">Bank Account (ACH)</option>
@@ -8093,7 +8362,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                 </div>
               </div>
 
-              <div className="mb-4 flex items-end gap-5 border-b border-[#e3e3e3] px-1" role="tablist" aria-label="Payment methods">
+              <ScrollableTabs className="mb-4 flex items-end gap-5 border-b border-[#e3e3e3] px-1" role="tablist" aria-label="Payment methods" activeKey={paymentTab}>
                 {(["Credit Card", "Bank Account (ACH)"] as const).map(tab => (
                   <button
                     key={tab}
@@ -8108,7 +8377,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                     </span>
                   </button>
                 ))}
-              </div>
+              </ScrollableTabs>
 
               {paymentTab === "Credit Card" && (
             <div className="rounded-[14px] bg-[#FBFBFB] p-6">
@@ -8121,7 +8390,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   <button onClick={() => setCreditCardOpen(true)} className="flex h-10 items-center gap-1.5 rounded-full bg-black px-4 text-[11px] font-medium text-white transition-colors hover:bg-[#1a1a1a]/90"><Plus size={14} /> Add Credit Card</button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-5 max-lg:grid-cols-1">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {savedClinicCard ? (
                   <div className="rounded-[10px] border border-[#eaeaea] bg-white p-5">
                     <div className="flex items-start justify-between gap-4 border-b border-[#eeeeee] pb-4">
@@ -8158,10 +8427,10 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                       <button className="flex h-10 items-center gap-1.5 rounded-full bg-black px-4 text-[11px] font-medium text-white transition-colors hover:bg-[#1a1a1a]/90"><Plus size={14} /> Add Bank Account</button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-5 max-lg:grid-cols-1">
-                    <div className="overflow-hidden rounded-[10px] border border-[#eaeaea] bg-white">
-                      <div className="grid grid-cols-[56px_minmax(0,1fr)_100px_82px] border-b border-[#eee8e3] bg-[#fbfaf8] px-4 py-3">{["", "Bank Accounts", "Status", ""].map((h, index) => <span key={`${h}-${index}`} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c8c]">{h}</span>)}</div>
-                      <div className="grid grid-cols-[56px_minmax(0,1fr)_100px_82px] items-center px-4 py-4 text-[12px] text-[#1a1a1a]"><span className="flex h-9 w-12 items-center justify-center rounded-[5px] border border-[#dedede] bg-white px-1.5"><img src={chaseLogo} alt="Chase" className="h-auto w-full object-contain" /></span><div className="min-w-0"><p className="truncate text-[13px] font-semibold">Chase Bank</p><p className="mt-1 text-[11px] text-[#8c8c8c]">**** **** **** 2826</p></div><span className="w-fit rounded-full bg-black px-2.5 py-1 text-[9px] font-medium text-white">Active</span><button className="rounded-[7px] border border-[#D9DEDB] px-2.5 py-2 text-[11px] font-medium hover:bg-[#F7F8F7]">Update</button></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div className="bank-account-card overflow-hidden rounded-[10px] border border-[#eaeaea] bg-white">
+                      <div className="bank-account-heading border-b border-[#eee8e3] bg-[#fbfaf8] px-4 py-3">{["", "Bank Accounts", "Status", ""].map((h, index) => <span key={`${h}-${index}`} className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c8c]">{h}</span>)}</div>
+                      <div className="bank-account-row grid items-center px-4 py-4 text-[12px] text-[#1a1a1a]"><span className="flex h-9 w-12 items-center justify-center rounded-[5px] border border-[#dedede] bg-white px-1.5"><img decoding="async" loading="lazy" src={chaseLogo} alt="Chase" className="h-auto w-full object-contain" /></span><div className="min-w-0"><p className="truncate text-[13px] font-semibold">Chase Bank</p><p className="mt-1 text-[11px] text-[#8c8c8c]">**** **** **** 2826</p></div><span className="w-fit rounded-full bg-black px-2.5 py-1 text-[9px] font-medium text-white">Active</span><button className="rounded-[7px] border border-[#D9DEDB] px-2.5 py-2 text-[11px] font-medium hover:bg-[#F7F8F7]">Update</button></div>
                     </div>
                     <div className="rounded-[10px] border border-[#eaeaea] bg-[#FAFAFA] p-5"><AlertCircle size={17} className="mb-3 text-[#667085]" /><p className="text-[12px] leading-relaxed text-[#667085]">When this is your primary method, eligible Pay by Clinic orders will be charged to this bank account.</p></div>
                   </div>
@@ -8169,7 +8438,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   <section className="mt-6 border-t border-[#e8e9e8] pt-5">
                     <h4 className="mb-1 text-[13px] font-semibold text-[#1a1a1a]">Bank debit authorization</h4>
                     <p className="mb-4 text-[11px] leading-5 text-[#667085]">Required once so ScriptLinkRx has permission to debit this account when the clinic places an order.</p>
-                    <div className="grid grid-cols-2 gap-5 max-lg:grid-cols-1">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                       <div className="rounded-[10px] border border-[#eaeaea] bg-white p-6">
                         <div className="mb-5 flex items-center gap-4">
                           <div className="flex size-12 items-center justify-center rounded-[10px] bg-[#F1F2F2] text-[#4e5652]"><Upload size={22} strokeWidth={1.8} /></div>
@@ -8201,7 +8470,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                   <button className="flex h-10 items-center gap-1.5 rounded-full bg-black px-3 text-[11px] font-medium text-white transition-colors hover:bg-[#1a1a1a]/90"><Plus size={14} /> Add payout account</button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5 max-lg:grid-cols-1">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   <div className="rounded-[10px] border border-[#eaeaea] bg-white p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -8230,18 +8499,17 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
         </div>
       </div>
       {inviteUserOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-5 backdrop-blur-[3px]">
+        <ModalLayer onClose={() => setInviteUserOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-5 backdrop-blur-[3px]" label="Settings">
           <button type="button" className="absolute inset-0 cursor-default" onClick={() => setInviteUserOpen(false)} aria-label="Close invite user" />
           <form
             onSubmit={event => { event.preventDefault(); setInviteUserOpen(false); setInviteEmail(""); }}
             className="relative z-10 w-full max-w-[500px] overflow-hidden rounded-[10px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(20,28,24,0.2)]"
-            role="dialog"
-            aria-modal="true"
             aria-labelledby="invite-user-title"
           >
-            <div className="flex items-start justify-between border-b border-[#ececec] px-6 py-5">
+            <MobilePageHeader title="Invite user" onBack={() => setInviteUserOpen(false)} className="mobile-sheet-header" subtitle="Send a secure invitation to join your account." titleId="invite-user-title" />
+            <div className="max-lg:hidden flex items-start justify-between border-b border-[#ececec] px-6 py-5">
               <div>
-                <h2 id="invite-user-title" className="text-[20px] font-semibold text-[#171717]">Invite user</h2>
+                <h2 id={compactNavigation ? undefined : "invite-user-title"} className="text-[20px] font-semibold text-[#171717]">Invite user</h2>
                 <p className="mt-1 text-[11px] text-[#777]">Send a secure invitation to join your account.</p>
               </div>
               <button type="button" onClick={() => setInviteUserOpen(false)} className="flex size-9 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close">
@@ -8252,7 +8520,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <div className="rounded-[16px] bg-[#fafafa] p-5">
                 <label className="block">
                   <span className="mb-2 block text-[11px] font-medium text-[#292929]">Email address <span className="text-[#b4473d]">*</span></span>
-                  <input
+                  <input {...inputMetadata("Email address")}
                     autoFocus
                     required
                     type="email"
@@ -8268,21 +8536,20 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <button type="submit" className="h-11 w-full rounded-full bg-black text-[12px] font-semibold text-white transition-colors hover:bg-[#222]">Send invite</button>
             </div>
           </form>
-        </div>
+        </ModalLayer>
       )}
       {invitePrescriberOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-5 backdrop-blur-[3px]">
+        <ModalLayer onClose={() => setInvitePrescriberOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-5 backdrop-blur-[3px]" label="Settings">
           <button type="button" className="absolute inset-0 cursor-default" onClick={() => setInvitePrescriberOpen(false)} aria-label="Close invite prescriber" />
           <form
             onSubmit={event => { event.preventDefault(); setInvitePrescriberOpen(false); setInvitePrescriberEmail(""); }}
             className="relative z-10 w-full max-w-[500px] overflow-hidden rounded-[10px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(20,28,24,0.2)]"
-            role="dialog"
-            aria-modal="true"
             aria-labelledby="invite-prescriber-title"
           >
-            <div className="flex items-start justify-between border-b border-[#ececec] px-6 py-5">
+            <MobilePageHeader title="Invite prescriber" onBack={() => setInvitePrescriberOpen(false)} className="mobile-sheet-header" subtitle="Send a secure invitation to join your account." titleId="invite-prescriber-title" />
+            <div className="max-lg:hidden flex items-start justify-between border-b border-[#ececec] px-6 py-5">
               <div>
-                <h2 id="invite-prescriber-title" className="text-[20px] font-semibold text-[#171717]">Invite prescriber</h2>
+                <h2 id={compactNavigation ? undefined : "invite-prescriber-title"} className="text-[20px] font-semibold text-[#171717]">Invite prescriber</h2>
                 <p className="mt-1 text-[11px] text-[#777]">Send a secure invitation to join your account.</p>
               </div>
               <button type="button" onClick={() => setInvitePrescriberOpen(false)} className="flex size-9 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close">
@@ -8293,7 +8560,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <div className="rounded-[16px] bg-[#fafafa] p-5">
                 <label className="block">
                   <span className="mb-2 block text-[11px] font-medium text-[#292929]">Email address <span className="text-[#b4473d]">*</span></span>
-                  <input autoFocus required type="email" value={invitePrescriberEmail} onChange={event => setInvitePrescriberEmail(event.target.value)} placeholder="prescriber@example.com" className="h-11 w-full rounded-[10px] border border-white/90 bg-white px-3.5 text-[12px] text-[#222] outline-none placeholder:text-[#aaa] focus:border-black" />
+                  <input {...inputMetadata("Email address")} autoFocus required type="email" value={invitePrescriberEmail} onChange={event => setInvitePrescriberEmail(event.target.value)} placeholder="prescriber@example.com" className="h-11 w-full rounded-[10px] border border-white/90 bg-white px-3.5 text-[12px] text-[#222] outline-none placeholder:text-[#aaa] focus:border-black" />
                 </label>
               </div>
             </div>
@@ -8301,13 +8568,14 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <button type="submit" className="h-11 w-full rounded-full bg-black text-[12px] font-semibold text-white transition-colors hover:bg-[#222]">Send invite</button>
             </div>
           </form>
-        </div>
+        </ModalLayer>
       )}
       {addPrescriberOpen && (
-        <div className="fixed inset-0 z-[95] flex items-stretch justify-end bg-black/35 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setAddPrescriberOpen(false)} className="fixed inset-0 z-[95] flex items-stretch justify-end bg-black/35 backdrop-blur-[2px]" label="Settings">
           <button className="absolute inset-0 cursor-default" onClick={() => setAddPrescriberOpen(false)} aria-label="Close add prescriber" />
           <form onSubmit={event => { event.preventDefault(); setAddPrescriberOpen(false); }} className="relative z-10 flex h-full w-full max-w-[620px] flex-col overflow-hidden rounded-[10px] border-l border-[#e3e3e3] bg-white shadow-[-20px_0_60px_rgba(0,0,0,0.16)]">
-            <div className="flex shrink-0 items-start justify-between border-b border-[#ececec] px-6 py-5">
+            <MobilePageHeader title="Add prescriber" onBack={() => setAddPrescriberOpen(false)} className="mobile-sheet-header" subtitle="Add identity, licensing, and contact information."  />
+            <div className="max-lg:hidden flex shrink-0 items-start justify-between border-b border-[#ececec] px-6 py-5">
               <div><h2 className="text-[21px] font-semibold text-[#171717]">Add prescriber</h2><p className="mt-1 text-[11px] text-[#777]">Add identity, licensing, and contact information.</p></div>
               <button type="button" onClick={() => setAddPrescriberOpen(false)} className="flex size-9 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close"><X size={19} /></button>
             </div>
@@ -8315,17 +8583,17 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
               <div className="flex flex-col gap-6">
               <div className="order-1 grid gap-4 sm:grid-cols-6">
-                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Email <span className="text-[#b4473d]">*</span></span><input required type="email" value={newPrescriber.email} onChange={event => setNewPrescriber(current => ({ ...current, email: event.target.value }))} placeholder="name@company.com" className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" /></label>
-                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Password <span className="text-[#b4473d]">*</span></span><input required type="password" value={newPrescriber.password} onChange={event => setNewPrescriber(current => ({ ...current, password: event.target.value }))} placeholder="Create a secure password" className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" /></label>
+                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Email <span className="text-[#b4473d]">*</span></span><input {...inputMetadata("Email")} required type="email" value={newPrescriber.email} onChange={event => setNewPrescriber(current => ({ ...current, email: event.target.value }))} placeholder="name@company.com" className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" /></label>
+                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Password <span className="text-[#b4473d]">*</span></span><input {...inputMetadata("New password")} required type="password" value={newPrescriber.password} onChange={event => setNewPrescriber(current => ({ ...current, password: event.target.value }))} placeholder="Create a secure password" className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" /></label>
                 <label className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Title <span className="text-[#b4473d]">*</span></span><select required value={newPrescriber.title} onChange={event => setNewPrescriber(current => ({ ...current, title: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] bg-white px-3 text-[12px] outline-none focus:border-black"><option value="" disabled>Select</option><option>MD</option><option>DO</option><option>NP</option><option>PA</option></select></label>
-                {([['First name','firstName'],['Last name','lastName']] as const).map(([label,key]) => <label key={key} className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} <span className="text-[#b4473d]">*</span></span><input required value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>)}
-                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Date of birth</span><input type="date" value={newPrescriber.dob} onChange={event => setNewPrescriber(current => ({ ...current, dob: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
-                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">NPI number <span className="text-[#b4473d]">*</span></span><input required value={newPrescriber.npi} onChange={event => setNewPrescriber(current => ({ ...current, npi: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
-                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">DEA number</span><input value={newPrescriber.dea} onChange={event => setNewPrescriber(current => ({ ...current, dea: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
-                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">License number <span className="text-[#b4473d]">*</span></span><input required value={newPrescriber.license} onChange={event => setNewPrescriber(current => ({ ...current, license: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
-                {([['Phone number','phone',true],['Fax number','fax',false],['Cellphone','cell',false]] as const).map(([label,key,required]) => <label key={key} className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} {required && <span className="text-[#b4473d]">*</span>}</span><input required={required} type="tel" value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} placeholder="(000) 000-0000" className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" /></label>)}
-                {([['Address line 1','address1',true],['Address line 2','address2',false]] as const).map(([label,key,required]) => <label key={key} className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} {required && <span className="text-[#b4473d]">*</span>}</span><input required={required} value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>)}
-                {([['City','city'],['State','state'],['Zip code','zip']] as const).map(([label,key]) => <label key={key} className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} <span className="text-[#b4473d]">*</span></span><input required value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>)}
+                {([['First name','firstName'],['Last name','lastName']] as const).map(([label,key]) => <label key={key} className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} <span className="text-[#b4473d]">*</span></span><input {...inputMetadata(key)} required value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>)}
+                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Date of birth</span><input {...inputMetadata("Date of birth")} type="date" value={newPrescriber.dob} onChange={event => setNewPrescriber(current => ({ ...current, dob: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
+                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">NPI number <span className="text-[#b4473d]">*</span></span><input {...inputMetadata("NPI number")} required inputMode="numeric" value={newPrescriber.npi} onChange={event => setNewPrescriber(current => ({ ...current, npi: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
+                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">DEA number</span><input {...inputMetadata("DEA number")} value={newPrescriber.dea} onChange={event => setNewPrescriber(current => ({ ...current, dea: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
+                <label className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">License number <span className="text-[#b4473d]">*</span></span><input {...inputMetadata("License number")} required value={newPrescriber.license} onChange={event => setNewPrescriber(current => ({ ...current, license: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>
+                {([['Phone number','phone',true],['Fax number','fax',false],['Cellphone','cell',false]] as const).map(([label,key,required]) => <label key={key} className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} {required && <span className="text-[#b4473d]">*</span>}</span><input {...inputMetadata(key)} required={required} type="tel" value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} placeholder="(000) 000-0000" className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" /></label>)}
+                {([['Address line 1','address1',true],['Address line 2','address2',false]] as const).map(([label,key,required]) => <label key={key} className="block sm:col-span-3"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} {required && <span className="text-[#b4473d]">*</span>}</span><input {...inputMetadata(key)} required={required} value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>)}
+                {([['City','city'],['State','state'],['Zip code','zip']] as const).map(([label,key]) => <label key={key} className="block sm:col-span-2"><span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} <span className="text-[#b4473d]">*</span></span><input {...inputMetadata(key)} required value={newPrescriber[key]} onChange={event => setNewPrescriber(current => ({ ...current, [key]: event.target.value }))} className="h-10 w-full rounded-[10px] border border-[#d8d8d8] px-3.5 text-[12px] outline-none focus:border-black" /></label>)}
                 <label className="flex cursor-pointer items-center justify-between rounded-[10px] border border-[#e3e3e3] bg-[#fafafa] px-3.5 py-3 sm:col-span-6"><span><span className="block text-[12px] font-medium text-[#202020]">Active prescriber</span><span className="mt-0.5 block text-[10px] text-[#7c7c7c]">Can sign in and prescribe immediately</span></span><input type="checkbox" checked={newPrescriberActive} onChange={event => setNewPrescriberActive(event.target.checked)} className="peer sr-only" /><span className="relative h-6 w-11 rounded-full bg-[#dedede] transition-colors peer-checked:bg-black after:absolute after:left-1 after:top-1 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5" /></label>
               </div>
 
@@ -8342,16 +8610,17 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
             </div>
             <div className="flex shrink-0 flex-col gap-2 border-t border-[#ececec] bg-white px-6 py-4"><button type="submit" className="h-11 w-full rounded-full bg-black px-8 text-[13px] font-semibold text-white hover:bg-[#222]">Add prescriber</button><button type="button" onClick={() => setAddPrescriberOpen(false)} className="h-11 w-full rounded-full border border-[#d8d8d8] bg-white px-6 text-[12px] font-medium hover:bg-[#f2f2f2]">Cancel</button></div>
           </form>
-        </div>
+        </ModalLayer>
       )}
       {addUserOpen && (
-        <div className="fixed inset-0 z-[95] flex items-stretch justify-end bg-black/35 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setAddUserOpen(false)} className="fixed inset-0 z-[95] flex items-stretch justify-end bg-black/35 backdrop-blur-[2px]" label="Settings">
           <button className="absolute inset-0 cursor-default" onClick={() => setAddUserOpen(false)} aria-label="Close add user" />
           <form
             onSubmit={event => { event.preventDefault(); setAddUserOpen(false); }}
             className="relative z-10 flex h-full w-full max-w-[760px] flex-col overflow-hidden rounded-[10px] border-l border-[#e3e3e3] bg-white shadow-[-20px_0_60px_rgba(0,0,0,0.16)]"
           >
-            <div className="flex shrink-0 items-start justify-between border-b border-[#ececec] px-6 py-5">
+            <MobilePageHeader title="Add user" onBack={() => setAddUserOpen(false)} className="mobile-sheet-header" subtitle="Create an account and choose its access level."  />
+            <div className="max-lg:hidden flex shrink-0 items-start justify-between border-b border-[#ececec] px-6 py-5">
               <div><h2 className="text-[21px] font-semibold text-[#171717]">Add user</h2><p className="mt-1 text-[11px] text-[#777]">Create an account and choose its access level.</p></div>
               <button type="button" onClick={() => setAddUserOpen(false)} className="flex size-9 items-center justify-center text-[#777] transition-colors hover:text-black" aria-label="Close"><X size={19} /></button>
             </div>
@@ -8368,7 +8637,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
                 ] as const).map(([label, key, placeholder]) => (
                   <label key={key} className={key === "title" ? "block sm:col-span-2" : "block"}>
                     <span className="mb-1.5 block text-[11px] font-medium text-[#292929]">{label} <span className="text-[#b4473d]">*</span></span>
-                    <input
+                    <input {...inputMetadata(key)}
                       required
                       type={key === "email" ? "email" : key === "phone" ? "tel" : "text"}
                       value={newUser[key]}
@@ -8410,19 +8679,20 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <button type="button" onClick={() => setAddUserOpen(false)} className="h-11 w-full rounded-full border border-[#d8d8d8] bg-white px-6 text-[12px] font-medium text-black hover:bg-[#f2f2f2]">Cancel</button>
             </div>
           </form>
-        </div>
+        </ModalLayer>
       )}
       {creditCardOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#101512]/35 p-5 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setCreditCardOpen(false)} className="fixed inset-0 z-[90] flex items-center justify-center bg-[#101512]/35 p-5 backdrop-blur-[2px]" label="Settings">
           <button className="absolute inset-0 cursor-default" onClick={() => setCreditCardOpen(false)} aria-label="Close add credit card" />
           <section className="relative z-10 max-h-[calc(100vh-40px)] w-full max-w-[460px] overflow-y-auto rounded-[8px] bg-white px-5 py-5 shadow-[0_20px_60px_rgba(16,35,27,0.18)]">
-            <h2 className="text-[17px] font-medium text-[#171717]">Add credit card</h2>
+            <MobilePageHeader title="Add credit card" onBack={() => setCreditCardOpen(false)} className="mobile-sheet-header mobile-sheet-inset"  />
+            <div className="max-lg:hidden modal-header flex items-center justify-between gap-3"><h2 className="text-[17px] font-medium text-[#171717]">Add credit card</h2><button type="button" onClick={() => setCreditCardOpen(false)} aria-label="Close credit card form" className="flex size-11 items-center justify-center rounded-full hover:bg-[#f4f4f4]"><X size={19} /></button></div>
 
             <div className="mt-5 space-y-4">
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Card Information</span>
                 <div className="flex h-10 items-center rounded-[10px] border border-[#ef8c58] bg-white px-3.5 focus-within:border-[1.5px] focus-within:border-[#e76f32]">
-                  <input inputMode="numeric" placeholder="1234 1234 1234 1234" className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-[#a5a5a5]" />
+                  <input {...inputMetadata("Card Information")} inputMode="numeric" placeholder="1234 1234 1234 1234" className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-[#a5a5a5]" />
                   <div className="ml-2 flex items-center gap-1">
                     <span className="rounded-[2px] border border-[#d8d8d8] bg-white px-1 text-[9px] font-black italic text-[#1434CB]">VISA</span>
                     <span className="flex h-[18px] w-[27px] items-center justify-center rounded-[2px] bg-[#171717]"><span className="size-3 rounded-full bg-[#EB001B]" /><span className="-ml-1.5 size-3 rounded-full bg-[#F79E1B] opacity-90" /></span>
@@ -8435,17 +8705,17 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               <div className="grid grid-cols-2 gap-3">
                 <label>
                   <span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Expiration date</span>
-                  <input inputMode="numeric" placeholder="MM/YY" className="h-10 w-full rounded-[10px] border border-[#d7d7d7] bg-white px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" />
+                  <input {...inputMetadata("Expiration date")} inputMode="numeric" placeholder="MM/YY" className="h-10 w-full rounded-[10px] border border-[#d7d7d7] bg-white px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" />
                 </label>
                 <label>
                   <span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Security code</span>
-                  <input inputMode="numeric" placeholder="CVC" className="h-10 w-full rounded-[10px] border border-[#d7d7d7] bg-white px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" />
+                  <input {...inputMetadata("Security code")} inputMode="numeric" placeholder="CVC" className="h-10 w-full rounded-[10px] border border-[#d7d7d7] bg-white px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" />
                 </label>
               </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-[11px] font-medium text-[#292929]">Cardholder name <span className="text-[#b4473d]">*</span></span>
-                <input placeholder="Name on card" className="h-10 w-full rounded-[10px] border border-[#d7d7d7] bg-white px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" />
+                <input {...inputMetadata("Cardholder name")} placeholder="Name on card" className="h-10 w-full rounded-[10px] border border-[#d7d7d7] bg-white px-3.5 text-[12px] outline-none placeholder:text-[#aaa] focus:border-black" />
               </label>
 
               <div className="pt-1">
@@ -8480,7 +8750,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (p: Page) => void }) {
               </button>
             </div>
           </section>
-        </div>
+        </ModalLayer>
       )}
     </>
   );
@@ -8506,8 +8776,8 @@ function CartModeToolbar({
 
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3">
-      <div className="flex gap-1 rounded-[8px] bg-[#f6f4f5] p-1">
-        <button
+      <ScrollableTabs className="flex gap-1 rounded-[8px] bg-[#f6f4f5] p-1" activeKey={cartMode} aria-label="Patient cart mode">
+        <button data-active={cartMode === "single"}
           onClick={() => selectMode("single")}
           className={`h-8 rounded-[6px] px-4 text-[12px] font-medium transition-all ${
             cartMode === "single" ? "bg-white text-[#1a1a1a] shadow-sm" : "text-[#9d9d9d] hover:text-[#1a1a1a]"
@@ -8515,7 +8785,7 @@ function CartModeToolbar({
         >
           Single Patient
         </button>
-        <button
+        <button data-active={cartMode === "multi"}
           onClick={() => selectMode("multi")}
           className={`flex h-8 items-center gap-1.5 rounded-[6px] px-4 text-[12px] font-medium transition-all ${
             cartMode === "multi" ? "bg-white text-[#1a1a1a] shadow-sm" : "text-[#9d9d9d] hover:text-[#1a1a1a]"
@@ -8524,15 +8794,15 @@ function CartModeToolbar({
           Multi Patients
           <span className="flex size-3.5 items-center justify-center rounded-full bg-[#053c23] text-[9px] font-semibold text-white">i</span>
         </button>
-      </div>
+      </ScrollableTabs>
 
-      <div className="group flex h-9 w-[220px] items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:w-[310px] focus-within:border-2 focus-within:border-black">
+      <div className="group flex h-9 w-[220px] max-w-full items-center gap-2 rounded-[9px] border border-[#cfcfcf] bg-white px-3 transition-all duration-300 ease-out focus-within:w-[310px] focus-within:border-2 focus-within:border-black">
         <Search size={14} strokeWidth={1.8} className="shrink-0 text-[#686868] transition-transform duration-300 group-focus-within:scale-110" />
         <input
           className="min-w-0 flex-1 bg-transparent text-[11px] font-medium text-[#1a1a1a] outline-none placeholder:text-[#686868]"
           placeholder="Search stock or Orders"
         />
-        <span className="text-[12px] text-[#686868]">⌘ + F</span>
+        <span className="search-shortcut text-[12px] text-[#686868]">⌘ + F</span>
       </div>
 
       {onCreatePatient && (
@@ -8664,7 +8934,7 @@ function SinglePatientCartPage({
 
     return (
       <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[8px] border border-[#eee] bg-gradient-to-b from-[#f7efe9] to-[#ece5b6]/45">
-        {item.image && <img src={item.image} alt="" className="h-12 w-12 object-contain mix-blend-multiply" />}
+        {item.image && <img decoding="async" loading="lazy" src={item.image} alt="" className="h-12 w-12 object-contain mix-blend-multiply" />}
       </div>
     );
   }
@@ -8695,7 +8965,7 @@ function SinglePatientCartPage({
               </span>
               <h2 className="text-[15px] font-semibold text-[#1a1a1a]">{pharmacy.name} Cart</h2>
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_240px_110px_106px_110px_40px] items-center border-b border-[#eee8e3] bg-[#fbfaf8] px-5 py-3 max-lg:hidden">
+            <div className="grid grid-cols-[minmax(0,1fr)_200px_80px_140px_80px_44px] items-center gap-4 border-b border-[#eee8e3] bg-[#fbfaf8] px-5 py-3 max-xl:hidden">
               {["Product", "Patient", "Price", "Qty", "Total", ""].map(h => (
                 <span key={h} className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8c8c8c]">{h}</span>
               ))}
@@ -8704,7 +8974,7 @@ function SinglePatientCartPage({
             <div className="divide-y divide-[#eee8e3]">
               {pharmacy.items.map(item => (
                 <div key={item.id} className="px-5 py-4 transition-colors hover:bg-[var(--app-soft-hover)]">
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_240px_110px_106px_110px_40px] lg:items-start">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_200px_80px_140px_80px_44px] lg:items-start">
                     <div className="flex min-w-0 gap-3">
                       <SingleCartThumb item={item} />
                       <div className="min-w-0">
@@ -8768,7 +9038,7 @@ function SinglePatientCartPage({
                         <label className="mb-1.5 block text-[12px] font-semibold text-[#1a1a1a]">Drug Name + Strength</label>
                         <input value={`${item.name} ${item.detail.split("|")[0].trim()}`} readOnly className="h-10 w-full cursor-not-allowed rounded-[7px] border border-[#d8dfdc] bg-[#f4f5f4] px-3 text-[13px] font-medium text-[#7b8380] outline-none" />
                       </div>
-                      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_200px_240px]">
+                      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px_160px]">
                         <div>
                           <label className="mb-1.5 block text-[12px] font-semibold text-[#1a1a1a]">Qty Size</label>
                           <input value={item.detail.includes("|") ? item.detail.split("|").slice(1).join("|").trim() : item.detail} readOnly className="h-10 w-full cursor-not-allowed rounded-[7px] border border-[#d8dfdc] bg-[#f4f5f4] px-3 text-[13px] font-medium text-[#7b8380] outline-none" />
@@ -8776,7 +9046,7 @@ function SinglePatientCartPage({
                         <div>
                           <label className="mb-1.5 block text-[12px] font-semibold text-[#1a1a1a]">Days Supply</label>
                           <input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min="1"
                             value={prescriptionDetails[item.id]?.days ?? ""}
                             onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)}
@@ -8787,7 +9057,7 @@ function SinglePatientCartPage({
                         <div>
                           <label className="mb-1.5 block text-[12px] font-semibold text-[#1a1a1a]">Authorized Refills</label>
                           <input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min="0"
                             value={prescriptionDetails[item.id]?.refills ?? ""}
                             onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)}
@@ -8836,13 +9106,13 @@ function SinglePatientCartPage({
 
             <div className="border-t border-[#eee8e3] bg-white px-5 py-5">
               <h3 className="text-[16px] font-semibold text-[#1a1a1a]">Shipping options</h3>
-              <div className="mt-4 flex flex-wrap gap-2 rounded-[10px] bg-[#f6f4f5] p-2">
+              <ScrollableTabs className="mt-4 flex gap-2 rounded-[10px] bg-[#f6f4f5] p-2" desktopLayout="wrap" aria-label="Shipping options">
                 {pharmacy.shipping.map((option, index) => (
-                  <button key={option} className={`h-9 rounded-[7px] px-3 text-[12px] font-medium ${index === 0 ? "bg-[#183229] text-white" : "bg-white text-[#1a1a1a]"}`}>
+                  <button data-active={index === 0} key={option} className={`h-9 rounded-[7px] px-3 text-[12px] font-medium ${index === 0 ? "bg-[#183229] text-white" : "bg-white text-[#1a1a1a]"}`}>
                     {option}
                   </button>
                 ))}
-              </div>
+              </ScrollableTabs>
             </div>
           </section>
           );
@@ -8914,11 +9184,13 @@ function SinglePatientCartPage({
       </div>
 
       {previewOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#111]/35 backdrop-blur-[3px]">
+        <ModalLayer onClose={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} className="fixed inset-0 z-50 flex justify-end bg-[#111]/35 backdrop-blur-[3px]" label="Single cart">
           <button className="absolute inset-0 cursor-default" onClick={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} aria-label="Close preview" />
           <aside className="relative h-full w-full max-w-[500px] overflow-auto border-l border-[#e8e3df] bg-[#FAFAFA] shadow-[-24px_0_70px_rgba(24,24,24,0.16)]">
-            <header className="sticky top-0 z-10 border-b border-[#eee8e3] bg-white/95 px-5 pb-5 pt-6 backdrop-blur">
-              <div className="flex items-start justify-between gap-4">
+            <MobilePageHeader title="Review and submit" onBack={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} className="mobile-sheet-header" subtitle="Confirm patients, prescriptions, payment, and shipping before submitting."  />
+            <header className="max-lg:hidden sticky top-0 z-10 border-b border-[#eee8e3] bg-white/95 px-5 pb-5 pt-6 backdrop-blur">
+
+            <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c95a1]">Checkout</p>
                   <h2 className="mt-1 text-[23px] font-semibold tracking-[-0.03em] text-[#171717]">Review and submit</h2>
@@ -9039,17 +9311,17 @@ function SinglePatientCartPage({
                   <div className="overflow-hidden rounded-[12px] border border-[#e1e5eb] bg-[#f8fafc]">
                     <div className="p-4">
                       <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="flex size-7 items-center justify-center rounded-[8px] bg-white text-[#2563eb] shadow-sm"><CreditCard size={14} /></span><div><p className="text-[12px] font-medium text-[#202020]">Payment</p><p className="text-[9px] text-[#818894]">Choose the payer</p></div></div><button type="button" className="text-[10px] font-medium text-[#2563eb] hover:underline">Add credit card</button></div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => setPaymentMethod("patient")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${paymentMethod === "patient" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><User size={13} />Patient</span>{paymentMethod === "patient" && <CheckCircle2 size={14} />}</button>
-                        <button type="button" onClick={() => setPaymentMethod("clinic")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${paymentMethod === "clinic" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><Building2 size={13} />Clinic</span>{paymentMethod === "clinic" && <CheckCircle2 size={14} />}</button>
-                      </div>
+                      <ScrollableTabs className="mt-3 grid grid-cols-2 gap-2" activeKey={paymentMethod} desktopLayout="grid" aria-label="Payer">
+                        <button data-active={paymentMethod === "patient"} type="button" onClick={() => setPaymentMethod("patient")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${paymentMethod === "patient" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><User size={13} />Patient</span>{paymentMethod === "patient" && <CheckCircle2 size={14} />}</button>
+                        <button data-active={paymentMethod === "clinic"} type="button" onClick={() => setPaymentMethod("clinic")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${paymentMethod === "clinic" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><Building2 size={13} />Clinic</span>{paymentMethod === "clinic" && <CheckCircle2 size={14} />}</button>
+                      </ScrollableTabs>
                     </div>
                     <div className="border-t border-[#e1e5eb] p-4">
                       <div className="flex items-center gap-2"><span className="flex size-7 items-center justify-center rounded-[8px] bg-white text-[#2563eb] shadow-sm"><Truck size={14} /></span><div><p className="text-[12px] font-medium text-[#202020]">Delivery</p><p className="text-[9px] text-[#818894]">Choose the destination</p></div></div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => setShipTo("patient")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${shipTo === "patient" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><User size={13} />Patient</span>{shipTo === "patient" && <CheckCircle2 size={14} />}</button>
-                        <button type="button" onClick={() => setShipTo("clinic")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${shipTo === "clinic" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><Building2 size={13} />Clinic</span>{shipTo === "clinic" && <CheckCircle2 size={14} />}</button>
-                      </div>
+                      <ScrollableTabs className="mt-3 grid grid-cols-2 gap-2" activeKey={shipTo} desktopLayout="grid" aria-label="Delivery destination">
+                        <button data-active={shipTo === "patient"} type="button" onClick={() => setShipTo("patient")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${shipTo === "patient" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><User size={13} />Patient</span>{shipTo === "patient" && <CheckCircle2 size={14} />}</button>
+                        <button data-active={shipTo === "clinic"} type="button" onClick={() => setShipTo("clinic")} className={`flex h-10 items-center justify-between rounded-[8px] border px-3 text-[11px] font-medium transition-all ${shipTo === "clinic" ? "border-[#7da2ff] bg-white text-[#1d4ed8] shadow-[0_3px_10px_rgba(37,99,235,0.10)]" : "border-transparent bg-[#eef1f5] text-[#68717d] hover:bg-white"}`}><span className="flex items-center gap-2"><Building2 size={13} />Clinic</span>{shipTo === "clinic" && <CheckCircle2 size={14} />}</button>
+                      </ScrollableTabs>
                     </div>
                   </div>
                 </div>
@@ -9062,8 +9334,8 @@ function SinglePatientCartPage({
                     {paymentMethod === "patient" ? "Pay by Patient" : "Pay by Clinic"} {paymentMethod === "patient" ? <User size={13} /> : <Building2 size={13} />}
                   </div>
                 ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                  <ScrollableTabs className="mt-3 flex gap-2" activeKey={paymentMethod} desktopLayout="wrap" aria-label="Payment method">
+                    <button data-active={paymentMethod === "patient"}
                       onClick={() => setPaymentMethod("patient")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         paymentMethod === "patient"
@@ -9073,7 +9345,7 @@ function SinglePatientCartPage({
                     >
                       Pay by Patient <User size={13} />
                     </button>
-                    <button
+                    <button data-active={paymentMethod === "clinic"}
                       onClick={() => setPaymentMethod("clinic")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         paymentMethod === "clinic"
@@ -9086,7 +9358,7 @@ function SinglePatientCartPage({
                     <button className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#2563EB] bg-white px-3 text-[12px] font-semibold text-[#2563EB] transition-colors hover:bg-[#EFF6FF]">
                       <Plus size={13} /> Credit Card
                     </button>
-                  </div>
+                  </ScrollableTabs>
                 )}
               </div>
 
@@ -9098,8 +9370,8 @@ function SinglePatientCartPage({
                     {shipTo === "patient" ? "Ship to Patient" : "Ship to Clinic"} {shipTo === "patient" ? <User size={13} /> : <Building2 size={13} />}
                   </div>
                 ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                  <ScrollableTabs className="mt-3 flex gap-2" activeKey={shipTo} desktopLayout="wrap" aria-label="Shipping destination">
+                    <button data-active={shipTo === "patient"}
                       onClick={() => setShipTo("patient")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         shipTo === "patient"
@@ -9109,7 +9381,7 @@ function SinglePatientCartPage({
                     >
                       Ship to Patient <User size={13} />
                     </button>
-                    <button
+                    <button data-active={shipTo === "clinic"}
                       onClick={() => setShipTo("clinic")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         shipTo === "clinic"
@@ -9119,7 +9391,7 @@ function SinglePatientCartPage({
                     >
                       Ship to Clinic <Building2 size={13} />
                     </button>
-                  </div>
+                  </ScrollableTabs>
                 )}
               </div>
             </section>
@@ -9147,13 +9419,14 @@ function SinglePatientCartPage({
             </div>
             </div>
           </aside>
-        </div>
+        </ModalLayer>
       )}
 
       {(showPatientPicker || showCreatePatient) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-label={showCreatePatient ? "Create patient" : "Choose patient"}>
+        <ModalLayer onClose={() => { setShowPatientPicker(false); setShowCreatePatient(false); }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4" label="Single cart">
           <div className="w-full max-w-[620px] overflow-hidden rounded-[10px] border border-[#e8e3df] bg-white">
-            <div className="flex items-center justify-between border-b border-[#eee8e3] px-5 py-4">
+            <MobilePageHeader title={showCreatePatient ? "Create Patient" : "Choose Patient"} onBack={() => { setShowPatientPicker(false); setShowCreatePatient(false); }} className="mobile-sheet-header" subtitle={showCreatePatient ? (activePharmacy ? `Add and assign to ${activePharmacy}.` : "Add a patient to your patient list.") : `Assign a patient to ${activePharmacy ?? "this pharmacy cart"}.`}  />
+            <div className="max-lg:hidden flex items-center justify-between border-b border-[#eee8e3] px-5 py-4">
               <div>
                 <h2 className="text-[16px] font-semibold text-[#1a1a1a]">{showCreatePatient ? "Create Patient" : "Choose Patient"}</h2>
                 <p className="mt-0.5 text-[11px] text-[#6f7782]">{showCreatePatient ? (activePharmacy ? `Add and assign to ${activePharmacy}.` : "Add a patient to your patient list.") : `Assign a patient to ${activePharmacy ?? "this pharmacy cart"}.`}</p>
@@ -9173,16 +9446,16 @@ function SinglePatientCartPage({
             {showCreatePatient ? (
               <form onSubmit={createPatient} className="p-5">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <input name="name" required placeholder="Full name" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] outline-none placeholder:text-[#9da4ae] focus:border-[#183229]" />
-                  <input name="phone" required placeholder="Phone number" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] outline-none placeholder:text-[#9da4ae] focus:border-[#183229]" />
-                  <input name="dob" type="date" aria-label="Date of birth" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] text-[#6f7782] outline-none focus:border-[#183229]" />
-                  <select name="gender" defaultValue="" aria-label="Gender" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] text-[#6f7782] outline-none focus:border-[#183229]">
+                  <input {...inputMetadata("name")} name="name" required placeholder="Full name" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] outline-none placeholder:text-[#9da4ae] focus:border-[#183229]" />
+                  <input {...inputMetadata("phone")} name="phone" required placeholder="Phone number" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] outline-none placeholder:text-[#9da4ae] focus:border-[#183229]" />
+                  <input {...inputMetadata("dob")} name="dob" type="date" aria-label="Date of birth" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] text-[#6f7782] outline-none focus:border-[#183229]" />
+                  <select autoComplete="sex" name="gender" defaultValue="" aria-label="Gender" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] text-[#6f7782] outline-none focus:border-[#183229]">
                     <option value="" disabled>Gender</option>
                     <option value="F">Female</option>
                     <option value="M">Male</option>
                     <option value="X">Other</option>
                   </select>
-                  <input name="address" required placeholder="Full shipping address" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] outline-none placeholder:text-[#9da4ae] focus:border-[#183229] sm:col-span-2" />
+                  <input {...inputMetadata("address")} name="address" required placeholder="Full shipping address" className="h-10 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] outline-none placeholder:text-[#9da4ae] focus:border-[#183229] sm:col-span-2" />
                 </div>
                 <div className="mt-5 flex justify-end gap-2">
                   <button type="button" onClick={() => setShowCreatePatient(false)} className="h-9 rounded-[7px] border border-[#d8dfdc] bg-white px-3 text-[12px] font-semibold text-[#183229]">Cancel</button>
@@ -9242,7 +9515,7 @@ function SinglePatientCartPage({
               </div>
             )}
           </div>
-        </div>
+        </ModalLayer>
       )}
     </>
   );
@@ -9347,7 +9620,7 @@ function CartItemImage({ item }: { item: MultiCartItem }) {
 
   return (
     <div className="relative flex h-14 w-12 shrink-0 items-center justify-center overflow-hidden bg-white">
-      {mockup ? <div className="absolute h-[245px] w-[184px] shrink-0 scale-[0.23]">{mockup}</div> : <img src={item.image ?? imgAminoQuad} alt={item.name} className="h-14 w-14 object-contain mix-blend-multiply" />}
+      {mockup ? <div className="absolute h-[245px] w-[184px] shrink-0 scale-[0.23]">{mockup}</div> : <img decoding="async" loading="lazy" src={item.image ?? imgAminoQuad} alt={item.name} className="h-14 w-14 object-contain mix-blend-multiply" />}
     </div>
   );
 }
@@ -9657,11 +9930,11 @@ function MultiPatientCartPage({
           <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
             <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Action</span><select value={sigBuilder.action} onChange={event => setSigBuilder(current => ({ ...current, action: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option>Inject</option><option>Take</option><option>Apply</option><option>Administer</option></select></label>
             <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Route</span><select value={sigBuilder.route} onChange={event => setSigBuilder(current => ({ ...current, route: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option value="intramuscularly">Intramuscular (IM)</option><option value="subcutaneously">Subcutaneous (SQ)</option><option value="intravenously">Intravenous (IV)</option><option value="orally">Oral</option></select></label>
-            <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Dose <span className="text-[#b44b42]">*</span></span><input autoFocus value={sigBuilder.dose} onChange={event => setSigBuilder(current => ({ ...current, dose: event.target.value }))} placeholder="Amount" className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(sigBuilder.dose)} /></label>
+            <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Dose <span className="text-[#b44b42]">*</span></span><input {...inputMetadata("Dose")} autoFocus value={sigBuilder.dose} onChange={event => setSigBuilder(current => ({ ...current, dose: event.target.value }))} placeholder="Amount" className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(sigBuilder.dose)} /></label>
             <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Unit</span><select value={sigBuilder.unit} onChange={event => setSigBuilder(current => ({ ...current, unit: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option>units</option><option>mg</option><option>mL</option><option>mcg</option><option>tablet(s)</option></select></label>
             <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Frequency <span className="text-[#b44b42]">*</span></span><select value={sigBuilder.frequency} onChange={event => setSigBuilder(current => ({ ...current, frequency: event.target.value }))} className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(sigBuilder.frequency)}><option value="" disabled>How often</option><option>once daily</option><option>twice daily</option><option>once weekly</option><option>twice weekly</option><option>as directed</option></select></label>
             <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Timing <span className="font-normal text-[#8a8a8a]">optional</span></span><select value={sigBuilder.timing} onChange={event => setSigBuilder(current => ({ ...current, timing: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option>Any time</option><option>In the morning</option><option>In the evening</option><option>At bedtime</option><option>Before meals</option><option>After meals</option></select></label>
-            <div className="sm:col-span-2"><p className="mb-2 text-[11px] font-semibold text-[#171717]">Injection sites <span className="font-normal text-[#8a8a8a]">optional</span></p><div className="flex flex-wrap gap-2">{["Abdomen", "Thigh", "Upper Arm", "Buttock"].map(site => <button key={site} type="button" onClick={() => toggleSigSite(site)} className={`h-8 rounded-full border px-3 text-[10px] font-medium transition-colors ${sigBuilder.sites.includes(site) ? "border-black bg-black text-white" : "border-[#EAE8E1] bg-white text-[#344054] hover:bg-[#f1f1f1]"}`}>{site}</button>)}</div></div>
+            <div className="sm:col-span-2"><p className="mb-2 text-[11px] font-semibold text-[#171717]">Injection sites <span className="font-normal text-[#8a8a8a]">optional</span></p><ScrollableTabs className="flex gap-2" desktopLayout="wrap" aria-label="Injection sites">{["Abdomen", "Thigh", "Upper Arm", "Buttock"].map(site => <button aria-pressed={sigBuilder.sites.includes(site)} key={site} type="button" onClick={() => toggleSigSite(site)} className={`h-8 rounded-full border px-3 text-[10px] font-medium transition-colors ${sigBuilder.sites.includes(site) ? "border-black bg-black text-white" : "border-[#EAE8E1] bg-white text-[#344054] hover:bg-[#f1f1f1]"}`}>{site}</button>)}</ScrollableTabs></div>
           </div>
           <aside className="border-t border-white/80 bg-[radial-gradient(circle_at_100%_0%,rgba(147,197,253,0.42),transparent_48%),linear-gradient(145deg,#f8fbff_0%,#eaf2ff_100%)] px-5 py-4 lg:border-l lg:border-t-0">
             <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2.5"><span className="flex size-8 items-center justify-center rounded-full bg-white/80 text-[#2563EB]"><CheckCircle2 size={16} /></span><div><p className="text-[12px] font-semibold text-[#172554]">Live directions</p><p className="text-[9px] text-[#64748b]">Updates as you complete the fields</p></div></div><span className="rounded-full bg-white/70 px-2.5 py-1 text-[9px] font-semibold text-[#2563EB]">SIG</span></div>
@@ -9682,6 +9955,11 @@ function MultiPatientCartPage({
     }
     setPrescriptionValidationAttempted(true);
     setExpandedPrescriptionIds(new Set(cartRows.filter(({ item }) => !isPrescriptionComplete(item.id)).map(({ item }) => item.id)));
+    requestAnimationFrame(() => {
+      const first = document.querySelector<HTMLElement>("[data-cart-prescription]:has(input:not(:disabled))");
+      first?.scrollIntoView({ behavior: motionBehavior(), block: "start" });
+      first?.querySelector<HTMLInputElement>("input:not(:disabled), select:not(:disabled)")?.focus({ preventScroll: true });
+    });
   }
 
   const cartCardThemes = {
@@ -9715,11 +9993,11 @@ function MultiPatientCartPage({
     <>
       <Header title="Cart" onNavigate={onNavigate} />
 
-      <div className="max-w-[1400px]">
-        {extraVariants && <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="cart-layout max-w-[1400px]">
+        {extraVariants && <ScrollableTabs className="mb-5 flex items-center gap-2" activeKey={cartCardVariant} desktopLayout="wrap" aria-label="Cart card style">
           <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#777]">Card style</span>
           {([1, 4, 3, 5, 6] as const).map(variant => (
-            <button
+            <button data-active={cartCardVariant === variant}
               key={variant}
               onClick={() => setCartCardVariant(variant)}
               className={`h-8 rounded-full px-3 text-[11px] font-semibold transition-colors ${cartCardVariant === variant ? "bg-[#111] text-white" : "border border-[#ddd] bg-white text-[#555] hover:border-[#999]"}`}
@@ -9727,8 +10005,8 @@ function MultiPatientCartPage({
               {variant === 1 ? "1. Current" : variant === 4 ? "2. Adnan Suggestion" : variant === 3 ? "3. Boom" : variant === 5 ? "4. Zee version" : "5. Simple"}
             </button>
           ))}
-        </div>}
-        <div className="grid grid-cols-1 items-start gap-10 xl:grid-cols-[minmax(0,1fr)_290px]">
+        </ScrollableTabs>}
+        <div className="grid grid-cols-1 items-start gap-10 2xl:grid-cols-[minmax(0,1fr)_290px]">
           <section className="min-w-0">
             {cartRowsWithNumbers.map(({ patient, item }, rowIndex) => {
               const pharmacy = item.pharmacy ?? cartData.pharmacy;
@@ -9772,7 +10050,7 @@ function MultiPatientCartPage({
                     </div>
                   )}
 
-                  <article
+                  <article data-cart-prescription
                     style={{ backgroundColor: activeCardTheme.item, borderColor: activeCardTheme.border }}
                     onClick={event => {
                       if (!(cartCardVariant === 3 || cartCardVariant === 4 || cartCardVariant === 5 || cartCardVariant === 6) || !hasFocusedOpenForm || isCompactActive) return;
@@ -9788,7 +10066,7 @@ function MultiPatientCartPage({
                     }`}
                   >
                     {cartCardVariant === 5 && !showBoomCompletedCard && (
-                      <div className="mb-4 hidden grid-cols-[minmax(0,1fr)_180px_114px_140px] gap-5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c88] lg:grid">
+                      <div className="mb-4 hidden grid-cols-[minmax(0,1fr)_180px_132px_140px] gap-5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8c8c88] xl:grid">
                         <span>Product Details</span>
                         <span>Patient</span>
                         <span className="w-28 text-center">Qty</span>
@@ -9796,7 +10074,7 @@ function MultiPatientCartPage({
                       </div>
                     )}
 
-                    {!showBoomCompletedCard && <div className={cartCardVariant === 3 ? "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_180px_90px_108px] lg:items-start" : "grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_180px_114px_140px] lg:items-start"}>
+                    {!showBoomCompletedCard && <div className={cartCardVariant === 3 ? "grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_180px_132px_108px] lg:items-start" : "grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_180px_132px_140px] lg:items-start"}>
                       <div className="flex min-w-0 gap-4">
                         <CartItemImage item={item} />
                         <div className="min-w-0">
@@ -9848,7 +10126,7 @@ function MultiPatientCartPage({
                         addedPrescriptionIds.has(item.id) ? (
                           cartCardVariant === 3 ? (
                             <div className="rounded-[6px] border border-[#E1E3E6] bg-white">
-                              <div className="grid grid-cols-1 gap-5 px-5 py-5 md:grid-cols-[minmax(210px,1fr)_minmax(210px,1fr)_150px_80px] md:items-start">
+                              <div className="grid grid-cols-1 gap-5 px-5 py-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px_140px] md:items-start">
                                 <div className="flex min-w-0 gap-3">
                                   <CartItemImage item={item} />
                                   <div className="min-w-0">
@@ -9964,19 +10242,19 @@ function MultiPatientCartPage({
                               <div className="grid gap-x-5 gap-y-4 md:grid-cols-[1.1fr_1.1fr_0.56fr_0.56fr]">
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#858585]">Strength</span>
-                                  <input disabled value={item.detail.split("|")[0]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[4px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
+                                  <input {...inputMetadata("Strength")} disabled value={item.detail.split("|")[0]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[4px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#858585]">Size</span>
-                                  <input disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[4px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
+                                  <input {...inputMetadata("Size")} disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[4px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Authorized Refills <span className="text-[#b44b42]">*</span></span>
-                                  <input type="number" min="0" placeholder="Refills" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[4px] border px-3 text-[12px] text-[#171717] outline-none " + requiredFieldClass(details?.refills)} />
+                                  <input {...inputMetadata("Authorized Refills")} type="number" inputMode="numeric" min="0" placeholder="Refills" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[4px] border px-3 text-[12px] text-[#171717] outline-none " + requiredFieldClass(details?.refills)} />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Days Supply <span className="text-[#b44b42]">*</span></span>
-                                  <input type="number" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[4px] border px-3 text-[12px] text-[#171717] outline-none " + requiredFieldClass(details?.days)} />
+                                  <input {...inputMetadata("Days Supply")} type="number" inputMode="numeric" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[4px] border px-3 text-[12px] text-[#171717] outline-none " + requiredFieldClass(details?.days)} />
                                 </label>
                                 <div className="grid gap-x-5 gap-y-4 md:col-span-4 md:grid-cols-2">
                                   <label className="block min-w-0">
@@ -10037,18 +10315,18 @@ function MultiPatientCartPage({
                             </div>
 	                          ) : cartCardVariant === 6 ? (
 	                            <div className="rounded-[10px] bg-white px-5 py-5 ring-1 ring-[#DDE8E2]">
-	                              <div className="grid gap-x-3 gap-y-3 md:grid-cols-[minmax(150px,0.44fr)_76px_76px_minmax(280px,1fr)]">
+	                              <div className="grid gap-x-3 gap-y-3 md:grid-cols-[minmax(0,1fr)_90px_90px_minmax(0,1fr)]">
 	                                <label className="block">
 	                                  <span className="mb-1 flex h-[20px] items-end text-[11px] font-semibold text-[#858585]">Strength</span>
-	                                  <input disabled value={item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
+	                                  <input {...inputMetadata("Strength")} disabled value={item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
 	                                </label>
 	                                <label className="block">
 	                                  <span className="mb-1 flex h-[20px] items-end text-[10px] font-semibold leading-[10px] text-[#171717]">Authorized<br />Refills <span className="text-[#b44b42]">*</span></span>
-	                                  <input type="number" min="0" placeholder="Days" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.refills)} />
+	                                  <input {...inputMetadata("Authorized Refills")} type="number" inputMode="numeric" min="0" placeholder="Days" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.refills)} />
 	                                </label>
 	                                <label className="block">
 	                                  <span className="mb-1 flex h-[20px] items-end whitespace-nowrap text-[10px] font-semibold text-[#171717]">Days Supply <span className="text-[#b44b42]">*</span></span>
-	                                  <input type="number" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.days)} />
+	                                  <input {...inputMetadata("Days Supply")} type="number" inputMode="numeric" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.days)} />
 	                                </label>
 	                                <label className="block min-w-0">
 	                                  <span className="mb-1 flex h-[20px] items-end whitespace-nowrap text-[10px] font-semibold text-[#171717]">Directions of Use <span className="text-[#b44b42]">*</span></span>
@@ -10115,24 +10393,24 @@ function MultiPatientCartPage({
 	                            </div>
 	                          ) : cartCardVariant === 5 ? (
                             <div className="rounded-[10px] bg-white px-5 py-5 ring-1 ring-[#DDE8E2]">
-                              <div className="grid gap-x-4 gap-y-3 md:grid-cols-[150px_150px_88px_88px_minmax(0,1fr)]">
+                              <div className="grid gap-x-4 gap-y-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_100px_100px]">
                                 <label className="block">
                                   <span className="mb-1.5 block text-[10px] font-semibold text-[#676767]">Strength</span>
-                                  <input disabled value={item.detail.split("|")[0]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[11px] font-medium text-[#cfcfcd] outline-none" />
+                                  <input {...inputMetadata("Strength")} disabled value={item.detail.split("|")[0]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[11px] font-medium text-[#cfcfcd] outline-none" />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[10px] font-semibold text-[#676767]">Size</span>
-                                  <input disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[11px] font-medium text-[#cfcfcd] outline-none" />
+                                  <input {...inputMetadata("Size")} disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[11px] font-medium text-[#cfcfcd] outline-none" />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block whitespace-nowrap text-[10px] font-semibold text-[#171717]">Authorized Refills <span className="text-[#b44b42]">*</span></span>
-                                  <input type="number" min="0" placeholder="Days" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.refills)} />
+                                  <input {...inputMetadata("Authorized Refills")} type="number" inputMode="numeric" min="0" placeholder="Days" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.refills)} />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[10px] font-semibold text-[#171717]">Days Supply <span className="text-[#b44b42]">*</span></span>
-                                  <input type="number" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.days)} />
+                                  <input {...inputMetadata("Days Supply")} type="number" inputMode="numeric" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.days)} />
                                 </label>
-                                <label className="block md:col-span-5">
+                                <label className="block md:col-span-4">
                                   <span className="mb-1.5 block text-[10px] font-semibold text-[#171717]">Directions of Use <span className="text-[#b44b42]">*</span></span>
                                   <select value={details?.directions ?? ""} onChange={event => updatePrescriptionDetail(item.id, "directions", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.directions)}>
                                     <option value="" disabled>Select reason below or type out your own</option>
@@ -10142,7 +10420,7 @@ function MultiPatientCartPage({
                                     <option>Use as directed by prescriber</option>
                                   </select>
                                 </label>
-                                <label className="block md:col-span-5">
+                                <label className="block md:col-span-4">
                                   <span className="mb-1.5 block text-[10px] font-semibold text-[#171717]">Reason to Compound <span className="text-[#b44b42]">*</span></span>
                                   <select value={details?.reason ?? ""} onChange={event => updatePrescriptionDetail(item.id, "reason", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[11px] outline-none " + requiredFieldClass(details?.reason)}>
                                     <option value="" disabled>Select reason below or type out your own</option>
@@ -10199,19 +10477,19 @@ function MultiPatientCartPage({
                               <div className="grid gap-x-5 gap-y-4 md:grid-cols-[1.1fr_1.1fr_0.56fr_0.56fr]">
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#858585]">Strength</span>
-                                  <input disabled value={item.detail.split("|")[0]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
+                                  <input {...inputMetadata("Strength")} disabled value={item.detail.split("|")[0]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#858585]">Size</span>
-                                  <input disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
+                                  <input {...inputMetadata("Size")} disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#cfcfcd] outline-none" />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Authorized Refills <span className="text-[#b44b42]">*</span></span>
-                                  <input type="number" min="0" placeholder="Days" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.refills)} />
+                                  <input {...inputMetadata("Authorized Refills")} type="number" inputMode="numeric" min="0" placeholder="Days" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.refills)} />
                                 </label>
                                 <label className="block">
                                   <span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Days Supply <span className="text-[#b44b42]">*</span></span>
-                                  <input type="number" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.days)} />
+                                  <input {...inputMetadata("Days Supply")} type="number" inputMode="numeric" min="1" placeholder="Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.days)} />
                                 </label>
                                 <div className="grid gap-x-5 gap-y-4 md:col-span-4 md:grid-cols-2">
                                   <label className="block min-w-0">
@@ -10268,18 +10546,18 @@ function MultiPatientCartPage({
                               <div className="grid gap-x-5 gap-y-4 md:grid-cols-[minmax(145px,0.24fr)_minmax(0,1fr)]">
                               <label className="block">
                                 <span className="mb-1.5 block text-[10px] font-semibold text-[#303030]">Strength</span>
-                                <input disabled value={item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#9a9a9a] outline-none" />
+                                <input {...inputMetadata("Strength")} disabled value={item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#9a9a9a] outline-none" />
                               </label>
                               <label className="block">
                                 <span className="mb-1.5 block text-[10px] font-semibold text-[#303030]">Size</span>
-                                <input disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#9a9a9a] outline-none" />
+                                <input {...inputMetadata("Size")} disabled value={item.detail.split("|")[1]?.trim() ?? item.detail} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] font-medium text-[#9a9a9a] outline-none" />
                               </label>
                             </div>
 
                               <div className="grid gap-x-5 gap-y-4 md:grid-cols-[minmax(145px,0.24fr)_minmax(0,1fr)]">
                             <label className="block">
                               <span className="mb-1.5 block text-[11px] font-semibold text-[#303030]">Days Supply <span className="text-[#b44b42]">*</span></span>
-                              <input type="number" min="1" placeholder="Enter Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[10px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.days)} />
+                              <input {...inputMetadata("Days Supply")} type="number" inputMode="numeric" min="1" placeholder="Enter Days" value={details?.days ?? ""} onChange={event => updatePrescriptionDetail(item.id, "days", event.target.value)} className={"h-[34px] w-full rounded-[10px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.days)} />
                             </label>
 
                             <label className="block">
@@ -10294,7 +10572,7 @@ function MultiPatientCartPage({
 
                             <label className="block">
                               <span className="mb-1.5 block text-[11px] font-semibold text-[#303030]">Authorized Refills <span className="text-[#b44b42]">*</span></span>
-                              <input type="number" min="0" placeholder="Refills" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[10px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.refills)} />
+                              <input {...inputMetadata("Authorized Refills")} type="number" inputMode="numeric" min="0" placeholder="Refills" value={details?.refills ?? ""} onChange={event => updatePrescriptionDetail(item.id, "refills", event.target.value)} className={"h-[34px] w-full rounded-[10px] border px-3 text-[12px] outline-none " + requiredFieldClass(details?.refills)} />
                             </label>
 
                             <label className="block">
@@ -10369,7 +10647,7 @@ function MultiPatientCartPage({
             })}
           </section>
 
-          <aside className={`self-start bg-white transition-opacity xl:sticky xl:top-6 ${hasFocusedOpenForm ? "opacity-55 hover:opacity-85" : ""}`}>
+          <aside className={`self-start bg-white transition-opacity 2xl:sticky 2xl:top-6 ${hasFocusedOpenForm ? "opacity-55 hover:opacity-85" : ""}`}>
             <h2 className="text-[24px] font-normal text-[#171717]">Order Total</h2>
 
             {isMultiPatientVoucher ? (
@@ -10402,23 +10680,34 @@ function MultiPatientCartPage({
           </aside>
         </div>
       </div>
+      <div className="mobile-checkout-bar xl:hidden">
+        <div className="min-w-0"><p className="text-[11px] text-[#737373]">Order total</p><p className="text-[18px] font-semibold tabular-nums">${total.toFixed(2)}</p></div>
+        <button type="button" onClick={handleCheckout} className="min-h-12 flex-1 rounded-full bg-[#111] px-5 text-[14px] font-medium text-white">{prescriptionsComplete ? "Review checkout" : "Complete prescriptions"}</button>
+      </div>
       {previewOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#111]/35 backdrop-blur-[3px]">
+        <ModalLayer onClose={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} className="fixed inset-0 z-50 flex justify-end bg-[#111]/35 backdrop-blur-[3px]" label="Multi cart">
           <button className="absolute inset-0 cursor-default" onClick={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} aria-label="Close preview" />
           <aside className="relative h-full w-full max-w-[500px] overflow-auto bg-white shadow-[-24px_0_70px_rgba(24,24,24,0.16)]">
-            <header className="sticky top-0 z-10 border-b border-[#eee8e3] bg-white/95 px-5 pb-5 pt-6 backdrop-blur">
+            <MobilePageHeader title={reviewVariant === "current" ? "Review order" : "Review and submit"} onBack={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} className="mobile-sheet-header" subtitle="Confirm items, payment, shipping, and totals before submitting." ><ScrollableTabs className="mt-4 inline-flex rounded-[8px] bg-[#f1f1f1] p-1" activeKey={reviewVariant} aria-label="Checkout review style">
+                    {(["current", "v1", "v2"] as const).map(variant => (
+                      <button data-active={reviewVariant === variant} key={variant} type="button" onClick={() => setReviewVariant(variant)} className={`h-7 rounded-[6px] px-3 text-[10px] font-medium transition-all ${reviewVariant === variant ? "bg-white text-[#111] shadow-[0_1px_5px_rgba(0,0,0,0.10)]" : "text-[#777] hover:text-[#111]"}`}>
+                        {variant === "current" ? "Current" : variant.toUpperCase()}
+                      </button>
+                    ))}
+                  </ScrollableTabs></MobilePageHeader>
+            <header className="max-lg:hidden sticky top-0 z-10 border-b border-[#eee8e3] bg-white/95 px-5 pb-5 pt-6 backdrop-blur">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8c95a1]">Checkout</p>
                   <h2 className="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-[#171717]">{reviewVariant === "current" ? "Review order" : "Review and submit"}</h2>
                   <p className="mt-1 text-[12px] leading-[18px] text-[#6f7782]">Confirm items, payment, shipping, and totals before submitting.</p>
-                  <div className="mt-4 inline-flex rounded-[8px] bg-[#f1f1f1] p-1">
+                  <ScrollableTabs className="mt-4 inline-flex rounded-[8px] bg-[#f1f1f1] p-1" activeKey={reviewVariant} aria-label="Checkout review style">
                     {(["current", "v1", "v2"] as const).map(variant => (
-                      <button key={variant} type="button" onClick={() => setReviewVariant(variant)} className={`h-7 rounded-[6px] px-3 text-[10px] font-medium transition-all ${reviewVariant === variant ? "bg-white text-[#111] shadow-[0_1px_5px_rgba(0,0,0,0.10)]" : "text-[#777] hover:text-[#111]"}`}>
+                      <button data-active={reviewVariant === variant} key={variant} type="button" onClick={() => setReviewVariant(variant)} className={`h-7 rounded-[6px] px-3 text-[10px] font-medium transition-all ${reviewVariant === variant ? "bg-white text-[#111] shadow-[0_1px_5px_rgba(0,0,0,0.10)]" : "text-[#777] hover:text-[#111]"}`}>
                         {variant === "current" ? "Current" : variant.toUpperCase()}
                       </button>
                     ))}
-                  </div>
+                  </ScrollableTabs>
                 </div>
                 <button onClick={() => { setPreviewOpen(false); setPreviewSubmissionState("idle"); }} className="flex size-8 items-center justify-center rounded-full text-[#777] transition-colors hover:bg-[#f5f3ef] hover:text-[#111]" aria-label="Close preview">
                   <X size={17} strokeWidth={1.8} />
@@ -10537,31 +10826,31 @@ function MultiPatientCartPage({
                 <div className="space-y-5">
                   <div>
                     <p className="mb-3 text-[16px] font-medium text-[#181818]">Payment</p>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setPaymentMethod("patient")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${paymentMethod === "patient" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
+                    <ScrollableTabs className="flex gap-2" activeKey={paymentMethod} desktopLayout="wrap" aria-label="Payment method">
+                      <button data-active={paymentMethod === "patient"} type="button" onClick={() => setPaymentMethod("patient")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${paymentMethod === "patient" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
                         {paymentMethod === "patient" && <CheckCircle2 size={16} strokeWidth={2.2} className="absolute -right-2 -top-2 fill-[#2563EB] text-white" />}
                         <User size={13} strokeWidth={1.8} /> Pay by Patient
                       </button>
-                      <button type="button" onClick={() => setPaymentMethod("clinic")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${paymentMethod === "clinic" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
+                      <button data-active={paymentMethod === "clinic"} type="button" onClick={() => setPaymentMethod("clinic")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${paymentMethod === "clinic" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
                         {paymentMethod === "clinic" && <CheckCircle2 size={16} strokeWidth={2.2} className="absolute -right-2 -top-2 fill-[#2563EB] text-white" />}
                         <Building2 size={13} strokeWidth={1.8} /> Pay by Clinic
                       </button>
-                    </div>
+                    </ScrollableTabs>
                     <button type="button" className="mt-2.5 text-[10px] font-medium text-[#2563EB] transition-colors hover:text-[#1D4ED8]">+ Add credit card</button>
                     <p className="mt-2 text-[10px] text-[#7a837f]">Choose who will pay for this order.</p>
                   </div>
                   <div>
                     <p className="mb-3 text-[16px] font-medium text-[#181818]">Shipping</p>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setShipTo("patient")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${shipTo === "patient" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
+                    <ScrollableTabs className="flex gap-2" activeKey={shipTo} desktopLayout="wrap" aria-label="Shipping destination">
+                      <button data-active={shipTo === "patient"} type="button" onClick={() => setShipTo("patient")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${shipTo === "patient" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
                         {shipTo === "patient" && <CheckCircle2 size={16} strokeWidth={2.2} className="absolute -right-2 -top-2 fill-[#2563EB] text-white" />}
                         <User size={13} strokeWidth={1.8} /> Ship to Patient
                       </button>
-                      <button type="button" onClick={() => setShipTo("clinic")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${shipTo === "clinic" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
+                      <button data-active={shipTo === "clinic"} type="button" onClick={() => setShipTo("clinic")} className={`relative inline-flex h-9 items-center gap-2 rounded-[7px] border px-3 text-[11px] font-semibold transition-colors ${shipTo === "clinic" ? "border-2 border-[#2563EB] bg-white text-[#171a20]" : "border-[#d8dedd] bg-white text-[#6f7782] hover:border-[#9fa8b5]"}`}>
                         {shipTo === "clinic" && <CheckCircle2 size={16} strokeWidth={2.2} className="absolute -right-2 -top-2 fill-[#2563EB] text-white" />}
                         <Building2 size={13} strokeWidth={1.8} /> Ship to Clinic
                       </button>
-                    </div>
+                    </ScrollableTabs>
                     <p className="mt-2 text-[10px] text-[#7a837f]">{shipTo === "clinic" ? "You can select multiple patients for one clinic shipment." : "The order will be delivered to the patient address."}</p>
                   </div>
                 </div>
@@ -10611,8 +10900,8 @@ function MultiPatientCartPage({
                     {paymentMethod === "patient" ? "Pay by Patient" : "Pay by Clinic"} {paymentMethod === "patient" ? <User size={13} /> : <Building2 size={13} />}
                   </div>
                 ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                  <ScrollableTabs className="mt-3 flex gap-2" activeKey={paymentMethod} desktopLayout="wrap" aria-label="Payment method">
+                    <button data-active={paymentMethod === "patient"}
                       onClick={() => setPaymentMethod("patient")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         paymentMethod === "patient"
@@ -10622,7 +10911,7 @@ function MultiPatientCartPage({
                     >
                       Pay by Patient <User size={13} />
                     </button>
-                    <button
+                    <button data-active={paymentMethod === "clinic"}
                       onClick={() => setPaymentMethod("clinic")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         paymentMethod === "clinic"
@@ -10635,7 +10924,7 @@ function MultiPatientCartPage({
                     <button className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#2563EB] bg-white px-3 text-[12px] font-semibold text-[#2563EB] transition-colors hover:bg-[#EFF6FF]">
                       <Plus size={13} /> Credit Card
                     </button>
-                  </div>
+                  </ScrollableTabs>
                 )}
               </div>
 
@@ -10649,8 +10938,8 @@ function MultiPatientCartPage({
                     {shipTo === "patient" ? "Ship to Patient" : "Ship to Clinic"} {shipTo === "patient" ? <User size={13} /> : <Building2 size={13} />}
                   </div>
                 ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                  <ScrollableTabs className="mt-3 flex gap-2" activeKey={shipTo} desktopLayout="wrap" aria-label="Shipping destination">
+                    <button data-active={shipTo === "patient"}
                       onClick={() => setShipTo("patient")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         shipTo === "patient"
@@ -10660,7 +10949,7 @@ function MultiPatientCartPage({
                     >
                       Ship to Patient <User size={13} />
                     </button>
-                    <button
+                    <button data-active={shipTo === "clinic"}
                       onClick={() => setShipTo("clinic")}
                       className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px] font-semibold transition-colors ${
                         shipTo === "clinic"
@@ -10670,7 +10959,7 @@ function MultiPatientCartPage({
                     >
                       Ship to Clinic <Building2 size={13} />
                     </button>
-                  </div>
+                  </ScrollableTabs>
                 )}
               </div>
             </section>
@@ -10701,13 +10990,14 @@ function MultiPatientCartPage({
               </div>
             </div>
           </aside>
-        </div>
+        </ModalLayer>
       )}
       {sigBuilderItemId !== null && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-5 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => setSigBuilderItemId(null)} className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-5 backdrop-blur-[2px]" label="Multi cart">
           <button type="button" className="absolute inset-0 cursor-default" onClick={() => setSigBuilderItemId(null)} aria-label="Close SIG Builder" />
           <section className="relative z-10 max-h-[92vh] w-full max-w-[840px] overflow-y-auto rounded-[10px] bg-[#fbfbfb] shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
-            <div className="flex items-start justify-between gap-4 border-b border-[#ededed] bg-white px-6 py-5">
+            <MobilePageHeader title="Build directions" onBack={() => setSigBuilderItemId(null)} className="mobile-sheet-header" subtitle={`${activeSigItem?.name ?? "Prescription"} · Complete the required dose instructions below.`}  />
+            <div className="max-lg:hidden flex items-start justify-between gap-4 border-b border-[#ededed] bg-white px-6 py-5">
               <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="text-[18px] font-semibold text-[#171717]">Build directions</h2><span className="rounded-full bg-[#f1f1f1] px-2 py-1 text-[9px] font-semibold text-[#555]">SIG Builder</span></div><p className="mt-1 truncate text-[11px] text-[#667085]">{activeSigItem?.name ?? "Prescription"} · Complete the required dose instructions below.</p></div>
               <button type="button" onClick={() => setSigBuilderItemId(null)} className="mt-0.5 text-[#777] hover:text-black" aria-label="Close"><X size={19} /></button>
             </div>
@@ -10716,11 +11006,11 @@ function MultiPatientCartPage({
                 <div className="flex items-center justify-between sm:col-span-2"><p className="text-[11px] font-semibold text-[#171717]">Dose instructions</p><p className="text-[9px] text-[#8a8a8a]"><span className="text-[#b44b42]">*</span> Required</p></div>
                 <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Action</span><select value={sigBuilder.action} onChange={event => setSigBuilder(current => ({ ...current, action: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option>Inject</option><option>Take</option><option>Apply</option><option>Administer</option></select></label>
                 <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Route</span><select value={sigBuilder.route} onChange={event => setSigBuilder(current => ({ ...current, route: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option value="intramuscularly">Intramuscular (IM)</option><option value="subcutaneously">Subcutaneous (SQ)</option><option value="intravenously">Intravenous (IV)</option><option value="orally">Oral</option></select></label>
-                <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Dose <span className="text-[#b44b42]">*</span></span><input autoFocus value={sigBuilder.dose} onChange={event => setSigBuilder(current => ({ ...current, dose: event.target.value }))} placeholder="Amount" className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(sigBuilder.dose)} /></label>
+                <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Dose <span className="text-[#b44b42]">*</span></span><input {...inputMetadata("Dose")} autoFocus value={sigBuilder.dose} onChange={event => setSigBuilder(current => ({ ...current, dose: event.target.value }))} placeholder="Amount" className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(sigBuilder.dose)} /></label>
                 <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Unit</span><select value={sigBuilder.unit} onChange={event => setSigBuilder(current => ({ ...current, unit: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option>units</option><option>mg</option><option>mL</option><option>mcg</option><option>tablet(s)</option></select></label>
                 <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Frequency <span className="text-[#b44b42]">*</span></span><select value={sigBuilder.frequency} onChange={event => setSigBuilder(current => ({ ...current, frequency: event.target.value }))} className={"h-[34px] w-full rounded-[8px] border px-3 text-[12px] outline-none " + requiredFieldClass(sigBuilder.frequency)}><option value="" disabled>How often</option><option>once daily</option><option>twice daily</option><option>once weekly</option><option>twice weekly</option><option>as directed</option></select></label>
                 <label><span className="mb-1.5 block text-[11px] font-semibold text-[#171717]">Timing <span className="font-normal text-[#8a8a8a]">optional</span></span><select value={sigBuilder.timing} onChange={event => setSigBuilder(current => ({ ...current, timing: event.target.value }))} className="h-[34px] w-full rounded-[8px] border border-[#EAE8E1] bg-white px-3 text-[12px] outline-none focus:border-[#183229]"><option>Any time</option><option>In the morning</option><option>In the evening</option><option>At bedtime</option><option>Before meals</option><option>After meals</option></select></label>
-                <div className="sm:col-span-2"><p className="mb-2 text-[11px] font-semibold text-[#171717]">Injection sites <span className="font-normal text-[#8a8a8a]">optional</span></p><div className="flex flex-wrap gap-2">{["Abdomen", "Thigh", "Upper Arm", "Buttock"].map(site => <button key={site} type="button" onClick={() => toggleSigSite(site)} className={`h-8 rounded-full border px-3 text-[10px] font-medium transition-colors ${sigBuilder.sites.includes(site) ? "border-black bg-black text-white" : "border-[#EAE8E1] bg-white text-[#344054] hover:bg-[#f1f1f1]"}`}>{site}</button>)}</div></div>
+                <div className="sm:col-span-2"><p className="mb-2 text-[11px] font-semibold text-[#171717]">Injection sites <span className="font-normal text-[#8a8a8a]">optional</span></p><ScrollableTabs className="flex gap-2" desktopLayout="wrap" aria-label="Injection sites">{["Abdomen", "Thigh", "Upper Arm", "Buttock"].map(site => <button aria-pressed={sigBuilder.sites.includes(site)} key={site} type="button" onClick={() => toggleSigSite(site)} className={`h-8 rounded-full border px-3 text-[10px] font-medium transition-colors ${sigBuilder.sites.includes(site) ? "border-black bg-black text-white" : "border-[#EAE8E1] bg-white text-[#344054] hover:bg-[#f1f1f1]"}`}>{site}</button>)}</ScrollableTabs></div>
               </div>
               <aside className="m-4 rounded-[12px] border border-white/80 bg-[radial-gradient(circle_at_100%_0%,rgba(147,197,253,0.42),transparent_48%),linear-gradient(145deg,#f8fbff_0%,#eaf2ff_100%)] px-4 py-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)]">
                 <div className="flex items-center justify-between gap-3">
@@ -10739,7 +11029,7 @@ function MultiPatientCartPage({
               <div className="ml-auto flex items-center gap-3"><button type="button" onClick={() => setSigBuilderItemId(null)} className="text-[11px] font-medium text-[#202020]">Cancel</button><button type="button" disabled={!resolvedSigDirections.trim()} onClick={applySigBuilder} className="h-[35px] min-w-[120px] rounded-full bg-black px-5 text-[11px] font-semibold text-white hover:bg-[#121212] disabled:cursor-not-allowed disabled:bg-[#e5e5e5] disabled:text-[#999]">Save directions</button></div>
             </div>
           </section>
-        </div>
+        </ModalLayer>
       )}
     </>
   );
@@ -10861,7 +11151,7 @@ function CheckoutPrescriptionPage({ onNavigate }: { onNavigate: (p: Page) => voi
     }
     return (
       <div className="flex size-11 items-center justify-center overflow-hidden rounded-[8px] border border-[#eee] bg-gradient-to-b from-[#f7efe9] to-[#ece5b6]/45">
-        <img src={blankVialReference} alt="" className="h-12 w-12 object-contain mix-blend-multiply" />
+        <img decoding="async" loading="lazy" src={blankVialReference} alt="" className="h-12 w-12 object-contain mix-blend-multiply" />
       </div>
     );
   }
@@ -10919,9 +11209,10 @@ function CheckoutPrescriptionPage({ onNavigate }: { onNavigate: (p: Page) => voi
   }
 
   return (
-    <div className="-m-8 min-h-screen bg-[var(--app-soft-hover)] px-6 py-8">
+    <div className="checkout-prescription min-h-screen bg-[var(--app-soft-hover)] px-6 py-8">
       <div className="mx-auto max-w-[940px]">
-        <div className="flex items-center gap-3">
+        <MobilePageHeader title="New Prescription Order" onBack={() => onNavigate("cart-multi")} />
+      <div className="max-lg:hidden flex items-center gap-3">
           <PageBackButton onClick={() => onNavigate("cart-multi")} label="Back to cart" />
           <h1 className="text-[30px] font-semibold tracking-[-0.01em] text-[#1a1a1a]">New Prescription Order</h1>
         </div>
@@ -10988,11 +11279,12 @@ function CheckoutPrescriptionPage({ onNavigate }: { onNavigate: (p: Page) => voi
       </div>
 
       {reviewOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#1a1a1a]/35 backdrop-blur-[2px]">
+        <ModalLayer onClose={() => { setReviewOpen(false); setReviewSubmissionState("idle"); }} className="fixed inset-0 z-50 flex justify-end bg-[#1a1a1a]/35 backdrop-blur-[2px]" label="Checkout Prescription">
           <button className="absolute inset-0 cursor-default" onClick={() => { setReviewOpen(false); setReviewSubmissionState("idle"); }} aria-label="Close review" />
           <aside className="relative h-full w-full max-w-[430px] overflow-auto border-l border-[#e8e3df] bg-white px-6 py-6 shadow-2xl">
-            <button onClick={() => { setReviewOpen(false); setReviewSubmissionState("idle"); }} className="mb-6 flex size-8 items-center justify-center rounded-[7px] text-[#183229] hover:bg-[#f6f4f5]" aria-label="Close review"><XCircle size={18} /></button>
-            <h2 className="text-[22px] font-semibold text-[#1a1a1a]">Review order</h2>
+            <MobilePageHeader title="Review order" onBack={() => { setReviewOpen(false); setReviewSubmissionState("idle"); }} className="mobile-sheet-header mobile-sheet-inset" />
+            <div className="hidden lg:block"><button onClick={() => { setReviewOpen(false); setReviewSubmissionState("idle"); }} className="mb-6 flex size-8 items-center justify-center rounded-[7px] text-[#183229] hover:bg-[#f6f4f5]" aria-label="Close review"><XCircle size={18} /></button>
+            <h2 className="text-[22px] font-semibold text-[#1a1a1a]">Review order</h2></div>
 
             <section className="mt-7">
               <h3 className="border-b border-[#eee8e3] pb-3 text-[15px] font-semibold text-[#1a1a1a]">Order for</h3>
@@ -11058,7 +11350,7 @@ function CheckoutPrescriptionPage({ onNavigate }: { onNavigate: (p: Page) => voi
               />
             </div>
           </aside>
-        </div>
+        </ModalLayer>
       )}
     </div>
   );
@@ -11085,19 +11377,19 @@ function LoginPage({ onLogin, onRegister, onSingleSignOn, onBackToLanding }: { o
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
+    <main className="public-form-page relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
       <div className={`pointer-events-none absolute inset-0 ${loginRole === "pharmacy" ? "bg-[radial-gradient(ellipse_72%_82%_at_50%_0%,#ffe1e5_0%,#ffedf0_30%,#fff5f6_52%,#fffafa_70%,#ffffff_88%)]" : "bg-[radial-gradient(ellipse_72%_82%_at_50%_0%,#dce9ff_0%,#eaf2ff_30%,#f4f8ff_52%,#fbfdff_70%,#ffffff_88%)]"}`} />
       <div className="relative mx-auto flex min-h-screen w-full max-w-[620px] flex-col items-center px-6 pt-7">
         <button type="button" onClick={onBackToLanding} className="flex min-h-[42px] cursor-pointer items-center gap-2.5 rounded-[8px] px-2 py-1 transition-opacity hover:opacity-70" aria-label="Return to landing page">
           {loginRole === "pharmacy" ? (
-            <img src={maxrxLogo} alt="MaxRx" className="h-[38px] w-auto object-contain" />
+            <img decoding="async" src={maxrxLogo} alt="MaxRx" className="h-[38px] w-auto object-contain" />
           ) : (
-            <><img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" /><span className="font-['Poppins',sans-serif] text-[18px] font-semibold uppercase tracking-wide text-[#183229]">S<span className="lowercase">CRIPTLINKrx</span></span></>
+            <><img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" /><span className="font-['Poppins',sans-serif] text-[18px] font-semibold uppercase tracking-wide text-[#183229]">S<span className="lowercase">CRIPTLINKrx</span></span></>
           )}
         </button>
 
-        <section className="mt-[110px] w-full max-w-[430px] text-center">
-          <h1 className="text-[48px] font-semibold leading-none tracking-[-0.02em] text-[#1a1a1a]">
+        <section className="mt-12 sm:mt-[110px] w-full max-w-[430px] text-center">
+          <h1 className="text-[clamp(32px,7vw,48px)] font-semibold leading-[1.1] tracking-[-0.02em] text-[#1a1a1a]">
             Welcome back
           </h1>
           <p className="mt-5 text-[15px] text-[#1a1a1a]">Let’s get you logged in.</p>
@@ -11105,7 +11397,7 @@ function LoginPage({ onLogin, onRegister, onSingleSignOn, onBackToLanding }: { o
           <form onSubmit={submitLogin} className="mt-8">
             <label className="block text-left">
               <span className="text-[13px] font-medium text-[#1a1a1a]">Email address</span>
-              <input
+              <input {...inputMetadata("Email address")}
                 type="email"
                 value={loginRole === "provider" ? "demo@scriptlinkrx.com" : "pharmacy@scriptlinkrx.com"}
                 readOnly
@@ -11116,7 +11408,7 @@ function LoginPage({ onLogin, onRegister, onSingleSignOn, onBackToLanding }: { o
             <label className="mt-4 block text-left">
               <span className="text-[13px] font-medium text-[#1a1a1a]">Password</span>
               <div className="mt-2 flex h-[52px] items-center rounded-[8px] border border-[#1a1a1a] bg-white px-4 focus-within:border-[#183229]">
-                <input
+                <input {...inputMetadata("Password")}
                   type="password"
                   value={password}
                   onChange={event => { setPassword(event.target.value); if (loginError) setLoginError(""); }}
@@ -11199,7 +11491,7 @@ function BusinessSelectionPage({ onSelect, onBack }: { onSelect: (business: stri
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(219,232,255,0.9),rgba(237,244,255,0.55)_38%,rgba(250,250,250,0)_76%)]" />
       <div className="relative w-full max-w-[520px]">
         <div className="mb-5 flex items-center justify-center gap-2.5">
-            <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[26px] w-8 object-contain" />
+            <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[26px] w-8 object-contain" />
             <span className="font-['Poppins',sans-serif] text-[14px] font-semibold uppercase tracking-wide text-[#183229]">S<span className="lowercase">CRIPTLINKrx</span></span>
         </div>
         <section className="w-full overflow-hidden rounded-[10px] border border-white/80 bg-white/65 shadow-[0_20px_60px_rgba(25,35,50,0.12)] backdrop-blur-[18px]">
@@ -11280,16 +11572,16 @@ function OrganizationSetupPage({ onCreate, stateLicense }: { onCreate: () => voi
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-6 py-10 font-['Inter',sans-serif] text-[#171717]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(219,232,255,0.9),rgba(237,244,255,0.55)_38%,rgba(255,255,255,0)_76%)]" />
-      <section className="relative w-full max-w-[470px] px-5 py-8">
+      <section className="relative w-full max-w-[470px] px-0 py-8 sm:px-5">
         <div className="mx-auto w-full">
           <div className="mb-5 flex items-center justify-center gap-2.5">
-            <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[27px] w-8 object-contain" />
+            <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[27px] w-8 object-contain" />
             <span className="font-['Poppins',sans-serif] text-[15px] font-semibold uppercase tracking-wide text-[#183229]">
               S<span className="lowercase">CRIPTLINKrx</span>
             </span>
           </div>
 
-          <div className="rounded-[14px] border border-white/80 bg-white/65 px-7 py-8 shadow-[0_14px_40px_rgba(24,50,41,0.08)] backdrop-blur-[18px] sm:px-9">
+          <div className="rounded-[14px] border border-white/80 bg-white/65 px-5 py-8 shadow-[0_14px_40px_rgba(24,50,41,0.08)] backdrop-blur-[18px] sm:px-9">
             <div className="text-center">
               <h1 className="text-[21px] font-semibold tracking-[-0.025em]">{activeStepContent.title}</h1>
               <p className="mt-1.5 text-[11px] text-[#747c78]">{activeStepContent.subtitle}</p>
@@ -11307,7 +11599,7 @@ function OrganizationSetupPage({ onCreate, stateLicense }: { onCreate: () => voi
                 <label key={field.id} className="block">
                   <span className="mb-1.5 block text-[11px] font-medium">{field.label} <span className="text-[#b4473d]">*</span></span>
                   <div className="flex h-10 items-center rounded-[8px] border border-[#d7dcda] bg-white px-3 focus-within:border-[1.5px] focus-within:border-[#183229]">
-                    <input type={visiblePassword === field.id ? "text" : "password"} value={field.value} onChange={event => { field.setValue(event.target.value); if (passwordError) setPasswordError(""); }} placeholder={field.placeholder} className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-[#a3aaa6]" />
+                    <input {...inputMetadata(field.label)} type={visiblePassword === field.id ? "text" : "password"} value={field.value} onChange={event => { field.setValue(event.target.value); if (passwordError) setPasswordError(""); }} placeholder={field.placeholder} className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-[#a3aaa6]" />
                     <button type="button" onClick={() => setVisiblePassword(current => current === field.id ? null : field.id)} className="text-[#7d8581]" aria-label={`Show ${field.label.toLowerCase()}`}><Eye size={14} /></button>
                   </div>
                   {field.id === "new" && <span className="mt-1 block text-[9px] text-[#818985]">Password must be at least 2 characters long</span>}
@@ -11331,7 +11623,7 @@ function OrganizationSetupPage({ onCreate, stateLicense }: { onCreate: () => voi
                 <div className="h-px bg-[#eceeec]" />
                 <ProfileField label="Address Line 1" defaultValue="123 Main Street" required />
                 <ProfileField label="Address Line 2" placeholder="Apt, Suite, Floor (optional)" />
-                <div className="grid grid-cols-[1fr_1fr_.8fr] gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_.8fr] gap-3">
                   <ProfileField label="City" defaultValue="Bronx" required />
                   <label className="block">
                     <span className="mb-1.5 block text-[11px] font-medium">State <span className="text-[#b4473d]">*</span></span>
@@ -11382,7 +11674,7 @@ function ProfileField({ label, defaultValue, placeholder, required = false }: { 
   return (
     <label className="block min-w-0">
       <span className="mb-1.5 block text-[11px] font-medium">{label} {required && <span className="text-[#b4473d]">*</span>}</span>
-      <input required={required} defaultValue={defaultValue} placeholder={placeholder} className="h-10 w-full rounded-[8px] border border-[#d7dcda] bg-white px-3 text-[11px] outline-none placeholder:text-[#a3aaa6] focus:border-[1.5px] focus:border-[#183229]" />
+      <input {...inputMetadata(label)} required={required} defaultValue={defaultValue} placeholder={placeholder} className="h-10 w-full rounded-[8px] border border-[#d7dcda] bg-white px-3 text-[11px] outline-none placeholder:text-[#a3aaa6] focus:border-[1.5px] focus:border-[#183229]" />
     </label>
   );
 }
@@ -11407,7 +11699,7 @@ function PaymentMethodOnboardingStep({ onBack, onComplete }: { onBack: () => voi
       <div className="space-y-3.5">
         <label className="block">
           <span className="mb-1.5 block text-[11px] font-medium">Cardholder Name <span className="text-[#b4473d]">*</span></span>
-          <input required placeholder="Enter name as it appears on card" className={inputClass} />
+          <input {...inputMetadata("Cardholder Name")} required placeholder="Enter name as it appears on card" className={inputClass} />
         </label>
 
         <div>
@@ -11415,7 +11707,7 @@ function PaymentMethodOnboardingStep({ onBack, onComplete }: { onBack: () => voi
             <label className="block">
               <span className="mb-1.5 block text-[10px] text-[#4f5753]">Card Number</span>
               <div className="flex h-10 items-center rounded-[8px] border border-[#d7dcda] bg-white px-3 focus-within:border-[1.5px] focus-within:border-[#183229]">
-                <input required inputMode="numeric" placeholder="4111 1111 1111 1111" className="min-w-0 flex-1 bg-transparent text-[11px] outline-none placeholder:text-[#6f7782]" />
+                <input {...inputMetadata("Card Number")} required inputMode="numeric" placeholder="4111 1111 1111 1111" className="min-w-0 flex-1 bg-transparent text-[11px] outline-none placeholder:text-[#6f7782]" />
                 <span className="ml-3 flex items-center gap-1 text-[9px] font-bold">
                   <span className="italic text-[#1434CB]">VISA</span>
                   <span className="size-4 rounded-full bg-[#EB001B]" />
@@ -11428,25 +11720,25 @@ function PaymentMethodOnboardingStep({ onBack, onComplete }: { onBack: () => voi
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1.5 block text-[10px] text-[#4f5753]">Expiration</span>
-                <input required placeholder="MM / YY" className={inputClass} />
+                <input {...inputMetadata("Expiration")} required placeholder="MM / YY" className={inputClass} />
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[10px] text-[#4f5753]">CVV/CVC</span>
-                <input required placeholder="CVC" className={inputClass} />
+                <input {...inputMetadata("CVV/CVC")} required placeholder="CVC" className={inputClass} />
               </label>
             </div>
             <label className="block">
               <span className="mb-1.5 block text-[10px] text-[#4f5753]">Address Line 1</span>
-              <input required placeholder="Address Line 1" className={inputClass} />
+              <input {...inputMetadata("Address Line 1")} required placeholder="Address Line 1" className={inputClass} />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-[10px] text-[#4f5753]">Address Line 2</span>
-              <input placeholder="Address Line 2" className={inputClass} />
+              <input {...inputMetadata("Address Line 2")} placeholder="Address Line 2" className={inputClass} />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="mb-1.5 block text-[10px] text-[#4f5753]">City</span>
-                <input required placeholder="City" className={inputClass} />
+                <input {...inputMetadata("City")} required placeholder="City" className={inputClass} />
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[10px] text-[#4f5753]">State</span>
@@ -11468,7 +11760,7 @@ function PaymentMethodOnboardingStep({ onBack, onComplete }: { onBack: () => voi
               </label>
               <label className="block">
                 <span className="mb-1.5 block text-[10px] text-[#4f5753]">Zip</span>
-                <input required placeholder="12345" className={inputClass} />
+                <input {...inputMetadata("Zip")} required placeholder="12345" className={inputClass} />
               </label>
             </div>
           </div>
@@ -11490,70 +11782,6 @@ function PaymentMethodOnboardingStep({ onBack, onComplete }: { onBack: () => voi
   );
 }
 
-function SignaturePad({ label = "Sign your signature:", onSignatureChange }: { label?: string; onSignatureChange?: (signed: boolean) => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawingRef = useRef(false);
-
-  function getPoint(event: ReactPointerEvent<HTMLCanvasElement>) {
-    const canvas = event.currentTarget;
-    const bounds = canvas.getBoundingClientRect();
-    return {
-      x: (event.clientX - bounds.left) * (canvas.width / bounds.width),
-      y: (event.clientY - bounds.top) * (canvas.height / bounds.height),
-    };
-  }
-
-  function startDrawing(event: ReactPointerEvent<HTMLCanvasElement>) {
-    const context = event.currentTarget.getContext("2d");
-    if (!context) return;
-    const point = getPoint(event);
-    drawingRef.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    context.beginPath();
-    context.moveTo(point.x, point.y);
-    onSignatureChange?.(true);
-  }
-
-  function draw(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!drawingRef.current) return;
-    const context = event.currentTarget.getContext("2d");
-    if (!context) return;
-    const point = getPoint(event);
-    context.lineWidth = 2.5;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.strokeStyle = "#183229";
-    context.lineTo(point.x, point.y);
-    context.stroke();
-  }
-
-  function clearSignature() {
-    const canvas = canvasRef.current;
-    canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-    onSignatureChange?.(false);
-  }
-
-  return (
-    <div className="mt-5">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[11px] font-medium">{label}</span>
-        <button type="button" onClick={clearSignature} className="rounded-[7px] border border-[#d7dcda] bg-white px-3 py-1 text-[10px] font-medium text-[#4f5753] hover:bg-[#f6f7f6]">Clear</button>
-      </div>
-      <canvas
-        ref={canvasRef}
-        width={720}
-        height={220}
-        onPointerDown={startDrawing}
-        onPointerMove={draw}
-        onPointerUp={() => { drawingRef.current = false; }}
-        onPointerCancel={() => { drawingRef.current = false; }}
-        className="h-[145px] w-full touch-none rounded-[9px] border border-[#d7dcda] bg-white/80"
-        aria-label="Digital signature drawing area"
-      />
-    </div>
-  );
-}
-
 function SingleSignOnPage({ onBackToLogin }: { onBackToLogin: () => void }) {
   function submitSingleSignOn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -11561,18 +11789,18 @@ function SingleSignOnPage({ onBackToLogin }: { onBackToLogin: () => void }) {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
+    <main className="public-form-page relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(197,216,83,0.28),rgba(217,251,244,0.26)_32%,rgba(255,255,255,0)_72%)]" />
       <div className="relative mx-auto flex min-h-screen w-full max-w-[620px] flex-col items-center px-6 pt-7">
         <button type="button" onClick={onBackToLogin} className="flex cursor-pointer items-center gap-2.5">
-          <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
+          <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
           <span className="font-['Poppins',sans-serif] text-[18px] font-semibold uppercase tracking-wide text-[#183229]">
             S<span className="lowercase">CRIPTLINKrx</span>
           </span>
         </button>
 
-        <section className="mt-[110px] w-full max-w-[430px] text-center">
-          <h1 className="text-[48px] font-semibold leading-none tracking-[-0.02em] text-[#1a1a1a]">
+        <section className="mt-12 sm:mt-[110px] w-full max-w-[430px] text-center">
+          <h1 className="text-[clamp(32px,7vw,48px)] font-semibold leading-[1.1] tracking-[-0.02em] text-[#1a1a1a]">
             Single sign-on
           </h1>
           <p className="mx-auto mt-5 max-w-[340px] text-[15px] leading-6 text-[#1a1a1a]">
@@ -11582,7 +11810,7 @@ function SingleSignOnPage({ onBackToLogin }: { onBackToLogin: () => void }) {
           <form onSubmit={submitSingleSignOn} className="mt-8">
             <label className="block text-left">
               <span className="text-[13px] font-medium text-[#1a1a1a]">Email address</span>
-              <input
+              <input {...inputMetadata("Email address")}
                 type="email"
                 className="mt-2 h-[52px] w-full rounded-[8px] border border-[#1a1a1a] bg-white px-4 text-[13px] font-medium text-[#1a1a1a] outline-none placeholder:text-[#6f7782] focus:border-[#183229]"
                 placeholder="info@mail.com"
@@ -11612,18 +11840,18 @@ function RegisterPage({ onBackToLogin }: { onBackToLogin: () => void }) {
   const selectClass = `${inputClass} appearance-none pr-10`;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
+    <main className="public-form-page relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(197,216,83,0.28),rgba(217,251,244,0.26)_32%,rgba(255,255,255,0)_72%)]" />
       <div className="relative mx-auto flex min-h-screen w-full max-w-[620px] flex-col items-center px-6 pt-7">
         <button type="button" onClick={onBackToLogin} className="flex cursor-pointer items-center gap-2.5">
-          <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
+          <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
           <span className="font-['Poppins',sans-serif] text-[18px] font-semibold uppercase tracking-wide text-[#183229]">
             S<span className="lowercase">CRIPTLINKrx</span>
           </span>
         </button>
 
-        <section className="mt-[88px] w-full max-w-[520px] text-center">
-          <h1 className="text-[48px] font-semibold leading-none tracking-[-0.02em] text-[#1a1a1a]">
+        <section className="mt-12 sm:mt-[88px] w-full max-w-[520px] text-center">
+          <h1 className="text-[clamp(32px,7vw,48px)] font-semibold leading-[1.1] tracking-[-0.02em] text-[#1a1a1a]">
             Create account
           </h1>
           <p className="mx-auto mt-5 max-w-[390px] text-[15px] leading-6 text-[#1a1a1a]">
@@ -11634,11 +11862,11 @@ function RegisterPage({ onBackToLogin }: { onBackToLogin: () => void }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-left">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Business Name <span className="text-[#c7532f]">*</span></span>
-                <input className={inputClass} placeholder="Enter business name" />
+                <input {...inputMetadata("Business Name")} className={inputClass} placeholder="Enter business name" />
               </label>
               <label className="block text-left">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">NPI Number <span className="text-[#8c95a1]">(Optional)</span></span>
-                <input className={inputClass} placeholder="1234567890" />
+                <input {...inputMetadata("NPI Number")} className={inputClass} placeholder="1234567890" />
               </label>
               <label className="relative block text-left">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Business Type <span className="text-[#c7532f]">*</span></span>
@@ -11671,17 +11899,17 @@ function RegisterPage({ onBackToLogin }: { onBackToLogin: () => void }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Address Line 1 <span className="text-[#c7532f]">*</span></span>
-                  <input className={inputClass} placeholder="Start typing address..." />
+                  <input {...inputMetadata("Address Line 1")} className={inputClass} placeholder="Start typing address..." />
                 </label>
                 <label className="block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Address Line 2</span>
-                  <input className={inputClass} placeholder="Apt, suite, floor (optional)" />
+                  <input {...inputMetadata("Address Line 2")} className={inputClass} placeholder="Apt, suite, floor (optional)" />
                 </label>
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <label className="block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">City <span className="text-[#c7532f]">*</span></span>
-                  <input className={inputClass} placeholder="City" />
+                  <input {...inputMetadata("City")} className={inputClass} placeholder="City" />
                 </label>
                 <label className="relative block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">State <span className="text-[#c7532f]">*</span></span>
@@ -11696,17 +11924,17 @@ function RegisterPage({ onBackToLogin }: { onBackToLogin: () => void }) {
                 </label>
                 <label className="block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Zip Code <span className="text-[#c7532f]">*</span></span>
-                  <input className={inputClass} placeholder="12345" />
+                  <input {...inputMetadata("Zip Code")} className={inputClass} placeholder="12345" />
                 </label>
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label className="block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Business Phone <span className="text-[#c7532f]">*</span></span>
-                  <input className={inputClass} placeholder="(555) 123-4567" />
+                  <input {...inputMetadata("Business Phone")} className={inputClass} placeholder="(555) 123-4567" />
                 </label>
                 <label className="block text-left">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Business Fax</span>
-                  <input className={inputClass} placeholder="(555) 123-4567" />
+                  <input {...inputMetadata("Business Fax")} className={inputClass} placeholder="(555) 123-4567" />
                 </label>
               </div>
             </div>
@@ -11738,18 +11966,18 @@ function RequestDemoPage({ onBackToLanding, onLoginClick }: { onBackToLanding: (
   const selectClass = `${inputClass} appearance-none pr-10`;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
+    <main className="public-form-page relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(197,216,83,0.28),rgba(217,251,244,0.26)_32%,rgba(255,255,255,0)_72%)]" />
       <div className="relative mx-auto flex min-h-screen w-full max-w-[980px] flex-col items-center px-6 pt-7">
         <button type="button" onClick={onBackToLanding} className="flex cursor-pointer items-center gap-2.5">
-          <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
+          <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
           <span className="font-['Poppins',sans-serif] text-[18px] font-semibold uppercase tracking-wide text-[#183229]">
             S<span className="lowercase">CRIPTLINKrx</span>
           </span>
         </button>
 
-        <section className="mt-[88px] w-full max-w-[620px] text-center">
-          <h1 className="text-[48px] font-semibold leading-none tracking-[-0.02em] text-[#1a1a1a]">
+        <section className="mt-12 sm:mt-[88px] w-full max-w-[620px] text-center">
+          <h1 className="text-[clamp(32px,7vw,48px)] font-semibold leading-[1.1] tracking-[-0.02em] text-[#1a1a1a]">
             Request a demo
           </h1>
           <p className="mx-auto mt-5 max-w-[440px] text-[15px] leading-6 text-[#1a1a1a]">
@@ -11760,7 +11988,7 @@ function RequestDemoPage({ onBackToLanding, onLoginClick }: { onBackToLanding: (
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Business Name <span className="text-[#c7532f]">*</span></span>
-                <input className={inputClass} placeholder="Enter your business name" />
+                <input {...inputMetadata("Business Name")} className={inputClass} placeholder="Enter your business name" />
               </label>
               <label className="relative block">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Business Type <span className="text-[#c7532f]">*</span></span>
@@ -11774,19 +12002,19 @@ function RequestDemoPage({ onBackToLanding, onLoginClick }: { onBackToLanding: (
               </label>
               <label className="block">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Contact Name <span className="text-[#c7532f]">*</span></span>
-                <input className={inputClass} placeholder="Enter your full name" />
+                <input {...inputMetadata("Contact Name")} className={inputClass} placeholder="Enter your full name" />
               </label>
               <label className="block">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Business Address <span className="text-[#c7532f]">*</span></span>
-                <input className={inputClass} placeholder="Enter your business address" />
+                <input {...inputMetadata("Business Address")} className={inputClass} placeholder="Enter your business address" />
               </label>
               <label className="block">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Contact Email <span className="text-[#c7532f]">*</span></span>
-                <input type="email" className={inputClass} placeholder="Enter your email address" />
+                <input {...inputMetadata("Contact Email")} type="email" className={inputClass} placeholder="Enter your email address" />
               </label>
               <label className="block">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Contact Phone <span className="text-[#c7532f]">*</span></span>
-                <input className={inputClass} placeholder="(555) 123-4567" />
+                <input {...inputMetadata("Contact Phone")} className={inputClass} placeholder="(555) 123-4567" />
               </label>
               <label className="block sm:col-span-2">
                 <span className="text-[13px] font-medium text-[#1a1a1a]">Notes</span>
@@ -11820,18 +12048,18 @@ function ContactPage({ onBackToLanding }: { onBackToLanding: () => void }) {
   const inputClass = "mt-2 h-[46px] w-full rounded-[8px] border border-[#1a1a1a] bg-white px-4 text-[13px] font-medium text-[#1a1a1a] outline-none placeholder:text-[#6f7782] focus:border-[#183229]";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
+    <main className="public-form-page relative min-h-screen overflow-hidden bg-white font-['Inter',sans-serif] text-[#1a1a1a]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_50%_0%,rgba(197,216,83,0.28),rgba(217,251,244,0.26)_32%,rgba(255,255,255,0)_72%)]" />
       <div className="relative mx-auto flex min-h-screen w-full max-w-[980px] flex-col items-center px-6 pt-7">
         <button type="button" onClick={onBackToLanding} className="flex cursor-pointer items-center gap-2.5">
-          <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
+          <img decoding="async" src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[30px] w-9 object-contain" />
           <span className="font-['Poppins',sans-serif] text-[18px] font-semibold uppercase tracking-wide text-[#183229]">
             S<span className="lowercase">CRIPTLINKrx</span>
           </span>
         </button>
 
-        <section className="mt-[92px] w-full text-center">
-          <h1 className="text-[48px] font-semibold leading-none tracking-[-0.02em] text-[#1a1a1a]">Reach ScriptLinkRx</h1>
+        <section className="mt-12 sm:mt-[92px] w-full text-center">
+          <h1 className="text-[clamp(32px,7vw,48px)] font-semibold leading-[1.1] tracking-[-0.02em] text-[#1a1a1a]">Reach ScriptLinkRx</h1>
           <p className="mx-auto mt-5 max-w-[460px] text-[15px] leading-6 text-[#1a1a1a]">
             A simple place for support, partnership questions, and compliance verification.
           </p>
@@ -11879,15 +12107,15 @@ function ContactPage({ onBackToLanding }: { onBackToLanding: () => void }) {
               <div className="mt-5 grid flex-1 gap-4 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Name <span className="text-[#c7532f]">*</span></span>
-                  <input className={inputClass} placeholder="Your name" />
+                  <input {...inputMetadata("Name")} className={inputClass} placeholder="Your name" />
                 </label>
                 <label className="block">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Organization</span>
-                  <input className={inputClass} placeholder="Company name" />
+                  <input {...inputMetadata("Organization")} className={inputClass} placeholder="Company name" />
                 </label>
                 <label className="block sm:col-span-2">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Email <span className="text-[#c7532f]">*</span></span>
-                  <input type="email" className={inputClass} placeholder="you@company.com" />
+                  <input {...inputMetadata("Email")} type="email" className={inputClass} placeholder="you@company.com" />
                 </label>
                 <label className="block sm:col-span-2">
                   <span className="text-[13px] font-medium text-[#1a1a1a]">Message <span className="text-[#c7532f]">*</span></span>
@@ -11914,18 +12142,18 @@ function PageContentSkeleton({ page }: { page: Page }) {
   if (isTablePage) {
     return (
       <div aria-live="polite" aria-busy="true" aria-label="Loading page" className="animate-pulse">
-        <div className="h-9 w-56 rounded bg-[#e8e8e6]" />
-        <div className="mt-8 flex items-center justify-between gap-6">
-          <div className="h-10 w-[310px] rounded-[9px] bg-[#eeeeec]" />
-          <div className="flex gap-3"><div className="h-10 w-28 rounded-[9px] bg-[#eeeeec]" /><div className="h-10 w-36 rounded-[9px] bg-[#eeeeec]" /></div>
+        <div className="h-9 w-56 max-w-full rounded bg-[#e8e8e6]" />
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="h-10 w-[310px] max-w-full rounded-[9px] bg-[#eeeeec]" />
+          <div className="flex flex-wrap gap-3"><div className="h-10 w-28 max-w-full rounded-[9px] bg-[#eeeeec]" /><div className="h-10 w-36 max-w-full rounded-[9px] bg-[#eeeeec]" /></div>
         </div>
         <div className="mt-8 overflow-hidden rounded-[10px]">
-          <div className="grid h-12 grid-cols-[1.2fr_1fr_1fr_1fr_.8fr] items-center gap-8 bg-[#f1f1ef] px-5">
+          <div className="hidden h-12 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,.8fr)] items-center gap-8 bg-[#f1f1ef] px-5 md:grid">
             {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-3 rounded bg-[#dcdcd9]" />)}
           </div>
           {Array.from({ length: 7 }, (_, row) => (
-            <div key={row} className={`grid h-[72px] grid-cols-[1.2fr_1fr_1fr_1fr_.8fr] items-center gap-8 px-5 ${row % 2 ? "bg-[#fafafa]" : "bg-white"}`}>
-              {Array.from({ length: 5 }, (_, column) => <div key={column} className={`h-4 rounded bg-[#e8e8e5] ${column === 0 ? "w-[82%]" : column === 4 ? "w-[60%]" : "w-full"}`} />)}
+            <div key={row} className={`grid grid-cols-1 items-center gap-3 px-5 py-5 md:h-[72px] md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,.8fr)] md:gap-8 md:py-0 ${row % 2 ? "bg-[#fafafa]" : "bg-white"}`}>
+              {Array.from({ length: 5 }, (_, column) => <div key={column} className={`h-4 rounded bg-[#e8e8e5] ${column === 0 ? "w-[82%] max-w-full" : column === 4 ? "w-[60%] max-w-full" : "w-full"}`} />)}
             </div>
           ))}
         </div>
@@ -11936,14 +12164,14 @@ function PageContentSkeleton({ page }: { page: Page }) {
   if (isCartPage) {
     return (
       <div aria-live="polite" aria-busy="true" aria-label="Loading cart" className="animate-pulse">
-        <div className="h-9 w-24 rounded bg-[#e8e8e6]" />
+        <div className="h-9 w-24 max-w-full rounded bg-[#e8e8e6]" />
         <div className="mt-10 rounded-[12px] bg-[#f7f7f6] p-6">
-          <div className="flex justify-between"><div className="h-6 w-52 rounded bg-[#dededb]" /><div className="h-10 w-64 rounded-[9px] bg-[#e6e6e3]" /></div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"><div className="h-6 w-52 max-w-full rounded bg-[#dededb]" /><div className="h-10 w-64 max-w-full rounded-[9px] bg-[#e6e6e3]" /></div>
           {Array.from({ length: 2 }, (_, index) => (
-            <div key={index} className="mt-6 grid min-h-[190px] grid-cols-[120px_1.2fr_1fr_230px] items-center gap-8 bg-white p-6">
-              <div className="mx-auto h-28 w-16 rounded-[24px] bg-[#e9e9e6]" />
-              <div className="space-y-3"><div className="h-5 w-44 rounded bg-[#dededb]" /><div className="h-4 w-56 rounded bg-[#eeeeeb]" /><div className="mt-8 h-10 w-full rounded-[9px] bg-[#f1f1ef]" /></div>
-              <div className="space-y-3"><div className="h-5 w-36 rounded bg-[#e2e2df]" /><div className="h-4 w-52 rounded bg-[#eeeeeb]" /><div className="h-4 w-40 rounded bg-[#eeeeeb]" /></div>
+            <div key={index} className="mt-6 grid grid-cols-1 items-center gap-4 xl:min-h-[190px] xl:grid-cols-[100px_minmax(0,1.2fr)_minmax(0,1fr)_180px] xl:gap-6 bg-white p-6">
+              <div className="mx-auto h-28 w-16 max-w-full rounded-[24px] bg-[#e9e9e6]" />
+              <div className="space-y-3"><div className="h-5 w-44 max-w-full rounded bg-[#dededb]" /><div className="h-4 w-56 max-w-full rounded bg-[#eeeeeb]" /><div className="mt-8 h-10 w-full rounded-[9px] bg-[#f1f1ef]" /></div>
+              <div className="space-y-3"><div className="h-5 w-36 max-w-full rounded bg-[#e2e2df]" /><div className="h-4 w-52 max-w-full rounded bg-[#eeeeeb]" /><div className="h-4 w-40 max-w-full rounded bg-[#eeeeeb]" /></div>
               <div className="h-11 rounded-full bg-[#e8e8e5]" />
             </div>
           ))}
@@ -11955,10 +12183,10 @@ function PageContentSkeleton({ page }: { page: Page }) {
   if (isSupportPage) {
     return (
       <div aria-live="polite" aria-busy="true" aria-label="Loading support tickets" className="animate-pulse">
-        <div className="flex items-center justify-between"><div className="h-9 w-52 rounded bg-[#e7e7e4]" /><div className="h-10 w-36 rounded-full bg-[#e4e4e1]" /></div>
-        <div className="mt-8 grid min-h-[650px] grid-cols-[360px_1fr] overflow-hidden rounded-[12px] border border-[#ededeb]">
-          <div className="border-r border-[#ededeb] p-4"><div className="h-10 rounded-[9px] bg-[#ededeb]" />{Array.from({ length: 6 }, (_, index) => <div key={index} className="mt-3 h-[82px] rounded-[9px] bg-[#f3f3f1]" />)}</div>
-          <div className="flex items-center justify-center"><div className="space-y-3 text-center"><div className="mx-auto size-14 rounded-full bg-[#ececea]" /><div className="mx-auto h-5 w-44 rounded bg-[#e4e4e1]" /><div className="mx-auto h-4 w-64 rounded bg-[#eeeeeb]" /></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="h-9 w-52 max-w-full rounded bg-[#e7e7e4]" /><div className="h-10 w-36 max-w-full rounded-full bg-[#e4e4e1]" /></div>
+        <div className="support-workspace mt-8 grid h-[calc(100dvh-190px)] min-h-[360px] grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] overflow-hidden rounded-[12px] border border-[#ededeb]">
+          <div className="min-h-0 overflow-y-auto p-4 lg:border-r lg:border-[#ededeb]"><div className="h-10 rounded-[9px] bg-[#ededeb]" />{Array.from({ length: 6 }, (_, index) => <div key={index} className="mt-3 h-[82px] rounded-[9px] bg-[#f3f3f1]" />)}</div>
+          <div className="hidden min-w-0 items-center justify-center p-4 lg:flex"><div className="w-full max-w-64 space-y-3 text-center"><div className="mx-auto size-14 rounded-full bg-[#ececea]" /><div className="mx-auto h-5 w-44 max-w-full rounded bg-[#e4e4e1]" /><div className="mx-auto h-4 w-64 max-w-full rounded bg-[#eeeeeb]" /></div></div>
         </div>
       </div>
     );
@@ -11966,11 +12194,11 @@ function PageContentSkeleton({ page }: { page: Page }) {
 
   return (
     <div aria-live="polite" aria-busy="true" aria-label="Loading page" className="animate-pulse">
-      <div className="h-9 w-56 rounded bg-[#e7e7e4]" />
-      <div className="mt-8 flex gap-4"><div className="h-10 w-36 rounded-[9px] bg-[#ededeb]" /><div className="h-10 w-36 rounded-[9px] bg-[#ededeb]" /></div>
-      <div className="mt-8 grid grid-cols-[1.35fr_.9fr] gap-5">
-        <div className="min-h-[520px] rounded-[12px] bg-[#f7f7f5] p-6"><div className="h-6 w-48 rounded bg-[#ddddda]" /><div className="mt-7 h-[360px] rounded-[10px] bg-white" /></div>
-        <div className="space-y-5"><div className="h-[245px] rounded-[12px] bg-[#f3f3f1] p-6"><div className="h-5 w-36 rounded bg-[#ddddda]" /><div className="mt-5 h-12 rounded-[9px] bg-white" /><div className="mt-3 h-12 rounded-[9px] bg-white" /></div><div className="h-[210px] rounded-[12px] bg-[#f3f3f1]" /></div>
+      <div className="h-9 w-56 max-w-full rounded bg-[#e7e7e4]" />
+      <div className="mt-8 flex flex-wrap gap-4"><div className="h-10 w-36 max-w-full rounded-[9px] bg-[#ededeb]" /><div className="h-10 w-36 max-w-full rounded-[9px] bg-[#ededeb]" /></div>
+      <div className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,.9fr)]">
+        <div className="xl:min-h-[520px] rounded-[12px] bg-[#f7f7f5] p-6"><div className="h-6 w-48 max-w-full rounded bg-[#ddddda]" /><div className="mt-7 h-[240px] sm:h-[360px] rounded-[10px] bg-white" /></div>
+        <div className="space-y-5"><div className="h-[245px] rounded-[12px] bg-[#f3f3f1] p-6"><div className="h-5 w-36 max-w-full rounded bg-[#ddddda]" /><div className="mt-5 h-12 rounded-[9px] bg-white" /><div className="mt-3 h-12 rounded-[9px] bg-white" /></div><div className="h-[210px] rounded-[12px] bg-[#f3f3f1]" /></div>
       </div>
     </div>
   );
@@ -11978,15 +12206,15 @@ function PageContentSkeleton({ page }: { page: Page }) {
 
 // ─── App Shell ────────────────────────────────────────────────────────────────
 
-type AuthView = "landing" | "login" | "business-select" | "organization" | "register" | "single-sign-on" | "request-demo" | "contact" | "sales-catalog";
-const publicViews: AuthView[] = ["landing", "login", "register", "request-demo", "contact", "sales-catalog"];
+type AuthView = "landing" | "login" | "business-select" | "organization" | "register" | "single-sign-on" | "request-demo" | "contact" | "sales-catalog" | "sales" | "w9";
+const publicViews: AuthView[] = ["landing", "login", "register", "request-demo", "contact", "sales-catalog", "sales", "w9"];
 
 export default function App() {
   const [initialPublicView] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get("view");
     return publicViews.find(view => view === requested);
   });
-  const [isAuthenticated, setIsAuthenticated] = useState(!initialPublicView);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !initialPublicView && window.localStorage.getItem("scriptlinkrx-signed-in") === "true");
   const [epcsAccount, setEpcsAccount] = useState<EpcsAccount>(DEMO_EPCS_ACCOUNT);
   const stateLicense = useStateLicenseDocument(epcsAccount.id);
   const [authView, setAuthView] = useState<AuthView>(initialPublicView ?? "landing");
@@ -11999,6 +12227,7 @@ export default function App() {
   const [pharmacyCatalog, setPharmacyCatalog] = useState(() => window.localStorage.getItem("scriptlinkrx-pharmacy-catalog") === "true");
   const [page, setPage] = useState<Page>(() => pageFromLink(window.location.hash) ?? DEFAULT_PAGE);
   const [pageLoading, setPageLoading] = useState(false);
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
   const previousPageRef = useRef<Page>(page);
   const [cartMode, setCartMode] = useState<CartMode>("single");
   const [multiCartPatientIds, setMultiCartPatientIds] = useState<number[]>([]);
@@ -12089,7 +12318,7 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    window.localStorage.setItem("scriptlinkrx-authenticated", String(isAuthenticated));
+    window.localStorage.setItem("scriptlinkrx-signed-in", String(isAuthenticated));
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -12111,7 +12340,7 @@ export default function App() {
   useEffect(() => {
     if (!chatOpen) return;
     window.requestAnimationFrame(() => {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      chatEndRef.current?.scrollIntoView({ behavior: motionBehavior(), block: "end" });
     });
   }, [chatMessages, alexTyping, chatOpen]);
 
@@ -12327,6 +12556,7 @@ export default function App() {
             onProductSelect={selectProduct}
             oldCatalog={oldCatalog}
             pharmacyCatalog={pharmacyCatalog}
+            catalogType={page === "catalog-503b" ? "503B" : "503A"}
           />
         );
       case "favorites":
@@ -12366,6 +12596,7 @@ export default function App() {
             onProductSelect={selectProduct}
             oldCatalog={oldCatalog}
             pharmacyCatalog={pharmacyCatalog}
+            catalogType={page === "catalog-503b" ? "503B" : "503A"}
           />
         );
     }
@@ -12438,7 +12669,15 @@ export default function App() {
       return <SalesCatalogAccessPage onCancel={() => setAuthView("landing")} backLabel="Return to homepage" />;
     }
 
-    return <LandingPage onLoginClick={() => setAuthView("login")} onRegisterClick={() => setAuthView("register")} onRequestDemoClick={() => setAuthView("request-demo")} onCatalogClick={() => setAuthView("sales-catalog")} />;
+    if (authView === "sales") {
+      return <SalesLanding onBackToLanding={() => setAuthView("landing")} onApply={() => setAuthView("w9")} />;
+    }
+
+    if (authView === "w9") {
+      return <W9OnboardingPage onCancel={() => setAuthView("sales")} />;
+    }
+
+    return <LandingPage onLoginClick={() => setAuthView("login")} onRegisterClick={() => setAuthView("register")} onRequestDemoClick={() => setAuthView("request-demo")} onCatalogClick={() => setAuthView("sales-catalog")} onSalesClick={() => setAuthView("sales")} />;
   }
 
   if (page === "sales-catalog") {
@@ -12485,8 +12724,9 @@ export default function App() {
     <AppLoadingContext.Provider value={{ runWithAppLoader, showToast }}>
       <CartSummaryContext.Provider value={{ cartItemCount, activeCartCatalogType, cartPreviewItems, checkCartCompatibility, addCartItems, updateCartItemQty, removeCartItem, clearCartItems }}>
         <ProductFavoritesContext.Provider value={{ favoriteProductIds, setFavoriteProductIds, favoriteProducts }}>
-          <div className={`app-theme app-theme-${appTheme} flex h-screen overflow-hidden bg-[var(--app-soft-hover)] font-['Inter',sans-serif]`}>
-            {/* Sidebar Navigation */}
+          <div className={`app-theme app-theme-${appTheme} app-shell flex h-dvh flex-col overflow-hidden lg:flex-row bg-[var(--app-soft-hover)] font-['Inter',sans-serif]`}>
+
+            <div className="dashboard-navigation">
             <Sidebar
               active={page === "not-found" || page === "something-went-wrong" ? "order-history" : page}
               epcsAccount={epcsAccount}
@@ -12511,17 +12751,30 @@ export default function App() {
               setPharmacyCatalog={setPharmacyCatalog}
             />
 
+            </div>
+
             {/* Main content area */}
-            <main ref={mainScrollRef} className="app-main-scroll h-screen min-w-0 flex-1 overflow-y-scroll p-3 pl-1.5">
-              <div className="bg-card rounded-[10px] min-h-full p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <main ref={mainScrollRef} className="app-main-scroll min-h-0 min-w-0 flex-1 overflow-y-auto p-2 lg:h-dvh lg:p-3 lg:pl-1.5">
+              <div className="app-content bg-card rounded-[10px] min-h-full px-4 py-6 sm:p-6 lg:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 <div className="w-full max-w-[1400px]">
-                  {pageLoading ? <PageContentSkeleton page={page} /> : renderPage()}
+                  {pageLoading ? <>
+                    <MobilePageHeader title={page === "product-detail" ? selectedProduct.name : page === "order-detail" ? `Order ${selectedOrder.id}` : ({ dashboard: "Dashboard", products: "Catalog", "catalog-503a": "Catalog", "catalog-503b": "503B Catalog", favorites: "Favorites", pharmacies: "Pharmacies", orders: "Orders", "order-history": "Order History", "pending-approvals": "Pending Approvals", support: "Support Tickets", users: "Patients", settings: "Settings", "cart-single": "Cart", "cart-multi": "Cart", "checkout-prescription": "New Prescription Order", "not-found": "404 — Page not found", "something-went-wrong": "Something went wrong", "sales-catalog": "Sales Catalog Access" }[page] ?? "Catalog")} />
+                    <div className="mobile-header-loading-body"><PageContentSkeleton page={page} /></div>
+                  </> : renderPage()}
                 </div>
               </div>
             </main>
 
+            {compactNavigation && <DashboardMobileNavigation
+              active={page} cartPage={cartPage} onNavigate={setPage}
+              epcsAccount={epcsAccount} stateLicense={stateLicense}
+              onEpcsProfileSave={profile => setEpcsAccount(current => ({ ...current, profile, doseSpotSyncRequired: true }))}
+              onEpcsSynced={() => setEpcsAccount(current => ({ ...current, doseSpotSyncRequired: false }))}
+              onLogout={() => { setAuthView("login"); setIsAuthenticated(false); setChatOpen(false); setChatMenuOpen(false); }}
+            />}
+
             {showPlatformTour && platformTourTooltipVisible && (
-                <div className={`chat-welcome-in fixed z-[82] w-[330px] rounded-[18px] bg-[#171717] p-5 text-white shadow-[0_22px_65px_rgba(0,0,0,0.32)] ${activeTourStep.card}`}>
+                <div className={`platform-tour chat-welcome-in fixed z-[82] w-[330px] max-w-full rounded-[18px] bg-[#171717] p-5 text-white shadow-[0_22px_65px_rgba(0,0,0,0.32)] ${activeTourStep.card}`}>
                   <span className={`absolute size-4 rotate-45 bg-[#171717] ${activeTourStep.arrow}`} aria-hidden="true" />
                   <div className="relative flex items-center justify-between">
                     <div className="flex size-10 items-center justify-center rounded-[12px] bg-[#dff2a8] text-[#064b2f]">{activeTourStep.icon}</div>
@@ -12543,7 +12796,7 @@ export default function App() {
 
             {/* Chat popup */}
             {chatOpen && (
-              <div className="chat-welcome-in fixed bottom-[76px] right-5 z-50 flex h-[430px] w-[385px] flex-col overflow-hidden rounded-[21px] bg-white shadow-[0_20px_55px_rgba(5,60,35,0.24)]">
+              <div className="assistant-chat chat-welcome-in fixed bottom-[76px] right-5 z-50 flex h-[430px] w-[calc(100vw-24px)] sm:w-[385px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[21px] bg-white shadow-[0_20px_55px_rgba(5,60,35,0.24)]">
                 <div className="flex h-[101px] items-center bg-[#004b2d] px-[35px] pb-[15px] pt-[14px] text-white">
                   <div className="flex size-[34px] items-center justify-center overflow-hidden rounded-full bg-[#f0b33a] text-[18px]">👨🏾</div>
                   <div className="ml-[11px]">
@@ -12553,7 +12806,7 @@ export default function App() {
                   <button onClick={() => setChatMenuOpen(current => !current)} className="ml-auto flex size-8 items-center justify-center text-[24px] leading-none text-white" aria-expanded={chatMenuOpen} aria-label="Chat options">⋮</button>
                 </div>
                 {chatMenuOpen && (
-                  <div className="absolute right-4 top-[62px] z-20 w-[205px] overflow-hidden rounded-[10px] border border-[#dfe5e2] bg-white p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
+                  <div className="absolute right-4 top-[62px] z-20 w-[205px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[10px] border border-[#dfe5e2] bg-white p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
                     <button onClick={() => { setChatMuted(current => !current); setChatMenuOpen(false); }} className="flex h-9 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[11px] font-medium text-[#1a1a1a] hover:bg-[#f3f6f4]"><Bell size={14} /> {chatMuted ? "Unmute notifications" : "Mute notifications"}</button>
                     <button onClick={() => { setChatMessages([{ id: Date.now(), sender: "alex", text: "Hi! I’m Alex. How can I help with your pharmacy or product order today?" }]); setChatInput(""); setAlexTyping(false); setChatMenuOpen(false); }} className="flex h-9 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[11px] font-medium text-[#1a1a1a] hover:bg-[#f3f6f4]"><RefreshCw size={14} /> New conversation</button>
                     <button onClick={() => { setPage("support"); setChatOpen(false); setChatMenuOpen(false); }} className="flex h-9 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[11px] font-medium text-[#1a1a1a] hover:bg-[#f3f6f4]"><MessageSquare size={14} /> Support tickets</button>
@@ -12583,9 +12836,9 @@ export default function App() {
             )}
 
             {/* Chat bubble */}
-            <div className="fixed bottom-5 right-5 z-50">
+            <div className="assistant-launcher fixed bottom-5 right-5 z-50">
               {showChatTutorial && !chatOpen && (
-                <div className="chat-welcome-in absolute bottom-[60px] right-0 w-[310px] rounded-[18px] bg-[#171717] p-4 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+                <div className="chat-welcome-in absolute bottom-[60px] right-0 w-[310px] max-w-[calc(100vw-32px)] rounded-[18px] bg-[#171717] p-4 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
                   <span className="absolute -bottom-2 right-[14px] size-4 rotate-45 bg-[#171717]" aria-hidden="true" />
                   <div className="relative flex items-start justify-between gap-3">
                     <div>

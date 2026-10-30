@@ -1,6 +1,7 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+@import './responsive.css';
 
 @keyframes app-toast-enter {
   from { opacity: 0; transform: translateY(8px); }

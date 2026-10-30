@@ -1,3 +1,4 @@
+import { useMediaQuery } from "./responsive-ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export type SidebarAlert = { id: string; label: string; content: ReactNode };
@@ -10,7 +11,8 @@ export function SidebarAlerts({ alerts, paused = false, priorityAlertId }: { ale
   const [visible, setVisible] = useState(() => typeof document === "undefined" || !document.hidden);
   const lastPriorityId = useRef(priorityAlertId);
   const activeIndex = Math.max(0, alerts.findIndex(alert => alert.id === activeId));
-  const rotating = !paused && !hovered && !focused && visible && alerts.length > 1;
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const rotating = !reducedMotion && !paused && !hovered && !focused && visible && alerts.length > 1;
 
   useEffect(() => {
     const updateVisibility = () => setVisible(!document.hidden);
@@ -69,7 +71,7 @@ export function SidebarAlerts({ alerts, paused = false, priorityAlertId }: { ale
               onClick={() => setActiveId(alert.id)}
               aria-label={`Show ${alert.label}`}
               aria-current={index === activeIndex ? "true" : undefined}
-              className="group flex h-6 w-[9px] items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#2563eb]"
+              className="group flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#2563eb]"
             >
               <span aria-hidden="true" className={`size-[5px] rounded-full transition-all duration-300 motion-reduce:transition-none ${index === activeIndex ? "scale-110 bg-[#66786b] shadow-[0_1px_3px_rgba(61,81,67,0.18)]" : "bg-[#d5dcd6] group-hover:bg-[#b6c1b8]"}`} />
             </button>

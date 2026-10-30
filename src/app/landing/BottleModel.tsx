@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { injectionProgress } from "./injection-motion";
 import { landingAsset } from "./assets";
 import type { InjectionScene } from "./injection-scene";
+import { useMediaQuery } from "../responsive-ui";
 
 export function BottleModel() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const staticScene = useMediaQuery("(max-width: 639px), (prefers-reduced-motion: reduce)");
 
   useEffect(() => {
+    if (staticScene) { setReady(false); return; }
     const host = canvasRef.current!;
     const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const modelRequest = new AbortController();
@@ -86,7 +89,7 @@ export function BottleModel() {
       motionPreference.removeEventListener("change", preferenceChange);
       scene?.dispose();
     };
-  }, []);
+  }, [staticScene]);
 
   return <figure className={`injection-card-model${ready ? " is-ready" : ""}`} aria-label="3D model of a NAD+ injection vial with its original silver cap and label">
     <div className="injection-card-canvas" ref={canvasRef} aria-hidden="true" />

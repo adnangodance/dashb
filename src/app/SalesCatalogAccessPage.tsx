@@ -1,3 +1,5 @@
+import { MobilePageHeader } from "./MobilePageHeader";
+import { useMediaQuery } from "./responsive-ui";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowRight, Info, LockKeyhole } from "lucide-react";
 import scriptlinkrxLogo from "@/assets/scriptlinkrx-logo.svg";
@@ -5,6 +7,7 @@ import scriptlinkrxLogo from "@/assets/scriptlinkrx-logo.svg";
 const CODE_LENGTH = 6;
 
 export function SalesCatalogAccessPage({ onCancel, backLabel = "Return to order history" }: { onCancel: () => void; backLabel?: string }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
   const [notice, setNotice] = useState<string | null>(null);
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
@@ -61,32 +64,34 @@ export function SalesCatalogAccessPage({ onCancel, backLabel = "Return to order 
   }
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#fbfcfe] px-5 py-10 font-['Inter',sans-serif] text-[#171717]">
+    <main className="sales-access relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#fbfcfe] px-3 py-10 sm:px-5 font-['Inter',sans-serif] text-[#171717]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_65%_at_50%_0%,#dbe8ff_0%,#edf4ff_45%,transparent_100%)]" />
       <div className="relative w-full max-w-[470px]">
-        <button type="button" onClick={onCancel} aria-label={backLabel} className="mx-auto mb-5 flex min-h-[38px] items-center gap-2.5 rounded-[8px] px-2 py-1 transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]">
+        <MobilePageHeader title="Sales Catalog Access" onBack={onCancel} titleId="sales-access-title" />
+        <button type="button" onClick={onCancel} aria-label={backLabel} className="max-lg:hidden mx-auto mb-5 flex min-h-[38px] items-center gap-2.5 rounded-[8px] px-2 py-1 transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]">
           <img src={scriptlinkrxLogo} alt="ScriptLinkRx" className="h-[27px] w-8 object-contain" />
           <span aria-hidden="true" className="font-['Poppins',sans-serif] text-[15px] font-semibold uppercase tracking-wide text-[#183229]">S<span className="lowercase">CRIPTLINKrx</span></span>
         </button>
 
-        <section aria-labelledby="sales-access-title" className="rounded-[14px] border border-white/80 bg-white/75 px-6 py-7 text-center shadow-[0_14px_40px_rgba(35,63,106,0.09)] backdrop-blur-[18px] sm:px-9 sm:py-8">
+        <section aria-labelledby="sales-access-title" className="rounded-[14px] border border-white/80 bg-white/75 px-4 py-7 text-center shadow-[0_14px_40px_rgba(35,63,106,0.09)] backdrop-blur-[18px] sm:px-9 sm:py-8">
             <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3974d8]">
               <LockKeyhole size={12} strokeWidth={1.8} aria-hidden="true" /> Invite-only access
             </span>
-            <h1 id="sales-access-title" className="mt-3 text-[22px] font-semibold leading-7 tracking-[-0.025em]">Enter access code</h1>
+            <h1 id={compactNavigation ? undefined : "sales-access-title"} className="hidden lg:block mt-3 text-[22px] font-semibold leading-7 tracking-[-0.025em]">Enter access code</h1>
             <p id="sales-access-description" className="mt-2 text-[12px] leading-[19px] text-[#747d89]">Enter the 6-digit code shared with your invitation to access the sales catalog.</p>
             <div className="my-6 h-px bg-[#e9edf3]" />
 
             <form noValidate onSubmit={submit} className="text-left">
               <fieldset aria-describedby="sales-access-description">
                 <legend className="mb-2.5 text-[11px] font-medium text-[#292929]">6-digit access code</legend>
-                <div className="grid grid-cols-6 gap-2 sm:gap-2.5">
+                <div className="grid grid-cols-6 gap-1.5 sm:gap-2.5">
                   {digits.map((digit, index) => (
                     <input
                       key={index}
                       ref={element => { inputs.current[index] = element; }}
                       type="text"
                       inputMode="numeric"
+                      enterKeyHint={index === CODE_LENGTH - 1 ? "done" : "next"}
                       autoComplete={index === 0 ? "one-time-code" : "off"}
                       autoCapitalize="none"
                       spellCheck={false}

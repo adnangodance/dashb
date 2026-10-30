@@ -39,7 +39,7 @@ export function AppToast({ toast, onClose }: { toast: ToastMessage; onClose: () 
 
   return (
     <div
-      className="fixed bottom-6 left-1/2 z-[10000] w-[min(460px,calc(100vw-24px))] -translate-x-1/2"
+      className="app-toast-position fixed bottom-6 left-1/2 z-[10000] w-[min(460px,calc(100vw-24px))] -translate-x-1/2"
       onKeyDown={event => { if (event.key === "Escape") onClose(); }}
     >
       <div className={`app-toast-enter rounded-[18px] border border-white/40 p-2 shadow-[0_12px_36px_-18px_rgba(25,30,50,0.16)] backdrop-blur-[6px] ${appearance.surface}`}>
@@ -53,7 +53,7 @@ export function AppToast({ toast, onClose }: { toast: ToastMessage; onClose: () 
           <button
             type="button"
             onClick={onClose}
-            className="h-7 shrink-0 rounded-[7px] border border-[#e7e8ec] bg-[#fafafa] px-2.5 text-[10px] font-medium text-[#34363c] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-[#f0f1f4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5c59e8]"
+            className="min-h-11 shrink-0 rounded-[7px] border border-[#e7e8ec] bg-[#fafafa] px-2.5 text-[10px] font-medium text-[#34363c] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-[#f0f1f4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5c59e8]"
           >
             Got it
           </button>
@@ -61,7 +61,7 @@ export function AppToast({ toast, onClose }: { toast: ToastMessage; onClose: () 
             type="button"
             onClick={onClose}
             aria-label="Dismiss notification"
-            className="flex size-6 shrink-0 items-center justify-center rounded-full border border-[#eeeff2] text-[#8a8f99] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f5f7] hover:text-[#34363c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5c59e8]"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[#eeeff2] text-[#8a8f99] shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#f5f5f7] hover:text-[#34363c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5c59e8]"
           >
             <X size={13} strokeWidth={1.6} aria-hidden="true" />
           </button>

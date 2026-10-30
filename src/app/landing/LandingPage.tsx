@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Star } from "lucide-react";
 import { landingAsset } from "./assets";
 import { LandingHero } from "./LandingHero";
@@ -7,11 +7,13 @@ import { InjectionSection } from "./InjectionSection";
 import { FooterWordmark } from "./FooterWordmark";
 import { OrderJourney } from "./OrderJourney";
 import { PlatformComparison } from "./PlatformComparison";
+import { ScrollableTabs } from "../responsive-ui";
 
 import { LandingPartners, LandingCoverage, useLandingCarousel, partnerCount } from "./LandingInteractions";
 import "./LandingPage.css";
+import "./LandingResponsive.css";
 
-type Props = { onLoginClick: () => void; onRegisterClick: () => void; onRequestDemoClick: () => void; onCatalogClick: () => void };
+type Props = { onLoginClick: () => void; onRegisterClick: () => void; onRequestDemoClick: () => void; onCatalogClick: () => void; onSalesClick: () => void };
 
 function TestimonialRating() {
   return <span className="slrx-testimonials-rating" role="img" aria-label="5 star rating">
@@ -19,7 +21,7 @@ function TestimonialRating() {
   </span>;
 }
 
-export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick, onCatalogClick }: Props) {
+export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick, onCatalogClick, onSalesClick }: Props) {
   useEffect(() => {
     const previousTitle = document.title;
     document.title = "ScriptLinkRx | Compounding Pharmacy Network";
@@ -27,6 +29,20 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
   }, []);
 
   const pageRef = useRef<HTMLElement>(null);
+  const [showMobileCta, setShowMobileCta] = useState(false);
+  useEffect(() => {
+    const hero = pageRef.current?.querySelector("#hero");
+    const end = pageRef.current?.querySelector("#cta");
+    if (!hero || !end) return;
+    let pastHero = false;
+    let nearEnd = false;
+    const update = () => setShowMobileCta(pastHero && !nearEnd);
+    const heroObserver = new IntersectionObserver(([entry]) => { pastHero = !entry.isIntersecting && entry.boundingClientRect.bottom < 0; update(); });
+    const endObserver = new IntersectionObserver(([entry]) => { nearEnd = entry.isIntersecting; update(); });
+    heroObserver.observe(hero);
+    endObserver.observe(end);
+    return () => { heroObserver.disconnect(); endObserver.disconnect(); };
+  }, []);
   useLandingSectionMotion(pageRef);
 
   const { ref: qualityRef, index: qualityIndex, onScroll: updateQualityIndex, scrollTo: scrollQuality } = useLandingCarousel(6, 0, true);
@@ -37,7 +53,7 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
     const link = (event.target as Element).closest<HTMLAnchorElement>("a[href]");
     if (!link) return;
     const href = link.getAttribute("href") ?? "";
-    const actions: Record<string, () => void> = { "?view=login": onLoginClick, "?view=register": onRegisterClick, "?view=request-demo": onRequestDemoClick, "?view=sales-catalog": onCatalogClick };
+    const actions: Record<string, () => void> = { "?view=login": onLoginClick, "?view=register": onRegisterClick, "?view=request-demo": onRequestDemoClick, "?view=sales-catalog": onCatalogClick, "?view=sales": onSalesClick };
     if (actions[href]) { event.preventDefault(); actions[href](); window.scrollTo(0, 0); }
     else if (href.startsWith("#")) {
       event.preventDefault();
@@ -48,8 +64,12 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
 
   return (
     <main ref={pageRef} className="slrx-landing" onClick={handleLinkClick}>
-      <div className="slrx-landing-intro">
-        <LandingHero />
+      <div className="slrx-landing-intro slrx-landing-intro-centered">
+        <LandingHero onNavigate={href => {
+          const actions: Record<string, () => void> = { "?view=login": onLoginClick, "?view=register": onRegisterClick, "?view=request-demo": onRequestDemoClick, "?view=sales": onSalesClick };
+          if (actions[href]) { actions[href](); window.scrollTo(0, 0); }
+          else requestAnimationFrame(() => document.getElementById(href.slice(1))?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
+        }} />
         <LandingPartners />
       </div>
       <LandingSection>
@@ -194,14 +214,14 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
                 <span className="slrx-quality-formulations-card-title-line">Available in multiple</span>
                 <span className="slrx-quality-formulations-card-title-line">formulations</span>
               </h3>
-              <div className="slrx-quality-formulations-dots" role="tablist" aria-label="Formulations">
+              <ScrollableTabs activeKey={qualityIndex} className="slrx-quality-formulations-dots" role="tablist" aria-label="Formulations">
                 <button type="button" role="tab" aria-selected={qualityIndex === 0} aria-label="NAD+ Injection vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 0 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(0)} />
                 <button type="button" role="tab" aria-selected={qualityIndex === 1} aria-label="Testosterone Cypionate vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 1 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(1)} />
                 <button type="button" role="tab" aria-selected={qualityIndex === 2} aria-label="Glutathione vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 2 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(2)} />
                 <button type="button" role="tab" aria-selected={qualityIndex === 3} aria-label="Nandrolone Decanoate vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 3 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(3)} />
                 <button type="button" role="tab" aria-selected={qualityIndex === 4} aria-label="Tri-Mix vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 4 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(4)} />
                 <button type="button" role="tab" aria-selected={qualityIndex === 5} aria-label="Sermorelin vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 5 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(5)} />
-              </div>
+              </ScrollableTabs>
             </div>
             <div className="slrx-quality-formulations-slides" ref={qualityRef} onScroll={updateQualityIndex}>
               <div className="slrx-quality-formulations-slide">
@@ -237,7 +257,7 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
             </span>
           </h2>
           <div className="slrx-testimonials-controls">
-            <div className="slrx-testimonials-dots" role="tablist" aria-label="Testimonials">
+            <ScrollableTabs activeKey={testimonialIndex} className="slrx-testimonials-dots" role="tablist" aria-label="Testimonials">
               <button type="button" role="tab" aria-selected={testimonialIndex === 0} aria-label="Testimonial from Dr. Michael Chen" className={`slrx-testimonials-dot ${testimonialIndex >= 0 ? "slrx-testimonials-dot-active" : ""}`} onClick={() => scrollTestimonial(0)}>
 
               </button>
@@ -247,7 +267,7 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
               <button type="button" role="tab" aria-selected={testimonialIndex === 2} aria-label="Testimonial from Dr. Lisa Rodriguez" className={`slrx-testimonials-dot ${testimonialIndex >= 2 ? "slrx-testimonials-dot-active" : ""}`} onClick={() => scrollTestimonial(2)}>
 
               </button>
-            </div>
+            </ScrollableTabs>
             <button type="button" className="slrx-testimonials-arrow" aria-label="Previous testimonial" onClick={() => scrollTestimonial(testimonialIndex - 1)}>
               <svg width="14" height="12" viewBox="0 0 14 12" fill="none" aria-hidden="true">
                 <path d="M6 1L1 6l5 5M1 6h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -561,6 +581,7 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
         </div>
         <FooterWordmark />
       </footer>
+      {showMobileCta && <div className="slrx-mobile-cta"><a href="?view=register">Get started</a><a href="?view=request-demo">Request a demo</a></div>}
     </main>
   );
 }

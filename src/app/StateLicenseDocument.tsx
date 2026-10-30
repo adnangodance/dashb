@@ -1,3 +1,5 @@
+import { MobilePageHeader } from "./MobilePageHeader";
+import { useBodyScrollLock, useMediaQuery } from "./responsive-ui";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUpRight, CheckCircle2, FileText, Loader2, Upload, X } from "lucide-react";
@@ -121,7 +123,7 @@ export function StateLicenseUpload({ license, onContinue, onSkip, onBack }: {
       {!record && license.error && <button type="button" onClick={license.retry} className="text-[12px] font-semibold text-[#2563eb] underline">Try again</button>}
       <p className="text-[10px] leading-4 text-[#818985]">Demo: documents are saved in this browser only.</p>
 
-      <div className="space-y-1.5 pt-1">
+      <div className="license-upload-actions space-y-1.5 pt-1">
         <button type="button" disabled={license.saving || (!saved && !file) || !record} onClick={async () => { if (saved || (file && await license.upload(file))) onContinue(); }} className="flex h-10 w-full items-center justify-center gap-2 rounded-[8px] bg-[#111] px-4 text-[11px] font-semibold text-white hover:bg-[#2a2a2a] disabled:cursor-not-allowed disabled:bg-[#d5d8d6] disabled:text-[#8b918e]">
           {license.saving && <Loader2 size={14} className="animate-spin" />}{license.saving ? "Saving…" : saved ? onSkip ? "Continue" : "Done" : onSkip ? "Upload & continue" : "Upload document"}
         </button>
@@ -133,6 +135,8 @@ export function StateLicenseUpload({ license, onContinue, onSkip, onBack }: {
 }
 
 export function StateLicenseDrawer({ license, onClose }: { license: StateLicenseController; onClose: () => void }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
+  useBodyScrollLock(true);
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -144,8 +148,9 @@ export function StateLicenseDrawer({ license, onClose }: { license: StateLicense
   return createPortal(
     <dialog ref={dialog} aria-labelledby="state-license-title" onCancel={event => { event.preventDefault(); if (!license.saving) onClose(); }} onClick={event => { if (event.target === event.currentTarget && !license.saving) onClose(); }} className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-full max-w-[560px] overflow-hidden rounded-l-[16px] border-0 bg-white p-0 font-['Inter',sans-serif] text-[#171717] shadow-[-18px_0_55px_rgba(0,0,0,0.16)] outline-none backdrop:bg-black/30 backdrop:backdrop-blur-[2px]">
       <div className="flex h-full flex-col">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece9e5] px-6 py-5">
-          <div><h2 id="state-license-title" ref={heading} tabIndex={-1} className="text-[20px] font-semibold outline-none">State license document</h2><p className="mt-1 text-[11px] leading-5 text-[#777]">Add a clear copy of your current state license.</p></div>
+        <MobilePageHeader title="State license document" onBack={onClose} titleId="state-license-title" titleRef={heading} subtitle="Add a clear copy of your current state license." className="mobile-sheet-header" backDisabled={license.saving} />
+        <header className="max-lg:hidden flex shrink-0 items-start justify-between gap-4 border-b border-[#ece9e5] px-6 py-5">
+          <div><h2 id={compactNavigation ? undefined : "state-license-title"} ref={compactNavigation ? undefined : heading} tabIndex={-1} className="text-[20px] font-semibold outline-none">State license document</h2><p className="mt-1 text-[11px] leading-5 text-[#777]">Add a clear copy of your current state license.</p></div>
           <button type="button" onClick={onClose} disabled={license.saving} aria-label="Close document upload" className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#777] hover:bg-[#f4f2ef] disabled:opacity-50"><X size={18} /></button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6"><StateLicenseUpload license={license} onContinue={onClose} onBack={onClose} /></div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type KeyboardEvent, type CSSProperties } from "react";
 import { landingAsset } from "./assets";
 import partners from "./partners.json";
 import coverage from "./coverage-map.json";
@@ -13,7 +13,9 @@ export function useLandingCarousel(count: number, gap: number, autoplay = false)
   const [index, setIndex] = useState(0);
   const stepWidth = useCallback(() => {
     const element = ref.current;
-    return element ? (gap ? (element.firstElementChild as HTMLElement)?.offsetWidth + gap : element.clientWidth) : 0;
+    if (!element) return 0;
+    const renderedGap = Number.parseFloat(window.getComputedStyle(element).columnGap) || gap;
+    return gap ? ((element.firstElementChild as HTMLElement)?.offsetWidth ?? 0) + renderedGap : element.clientWidth;
   }, [gap]);
   const scrollTo = useCallback((next: number) => {
     ref.current?.scrollTo({
@@ -177,6 +179,15 @@ export function LandingCoverage() {
     <div className={mapClass("container")}>
       <h2 className={mapClass("heading")}><span className={mapClass("heading-line")}>Proudly serving</span><span className={mapClass("heading-line")}>nationwide.</span></h2>
       <p className={mapClass("description")}>Select a state to view licensed pharmacy partners.</p>
+      <label className="slrx-coverage-selector">Find pharmacy coverage
+        <select value={selection?.state.id ?? ""} onChange={event => {
+          const state = coverage.states.find(state => state.id === event.target.value);
+          setSelection(state ? { state, x: 12, y: 12 } : null);
+        }} aria-controls="slrx-coverage-details">
+          <option value="">Choose a state</option>
+          {coverage.states.filter(state => state.id).slice().sort((a, b) => a.name.localeCompare(b.name)).map(state => <option key={state.id} value={state.id}>{state.name} · {state.partners.length} pharmacies</option>)}
+        </select>
+      </label>
       <div className={mapClass("map-container")}>
         <div ref={contentRef} className={mapClass("map-content")} onClick={() => setSelection(null)}>
           <div className={`${mapClass("map")} ${inView ? mapClass("map-in-view") : ""}`}>
@@ -197,7 +208,7 @@ export function LandingCoverage() {
               })}
             </svg>
           </div>
-          {selection && <div className={mapClass("info-card")} style={{ left: selection.x, top: selection.y }} onClick={event => event.stopPropagation()} role="region" aria-labelledby="slrx-coverage-info-title">
+          {selection && <div id="slrx-coverage-details" className={mapClass("info-card")} style={{ "--coverage-left": `${selection.x}px`, "--coverage-top": `${selection.y}px` } as CSSProperties} onClick={event => event.stopPropagation()} role="region" aria-labelledby="slrx-coverage-info-title">
             <div className={mapClass("info-header")}>
               <p id="slrx-coverage-info-title" className={mapClass("info-title")} aria-live="polite">{selection.state.name}</p>
               <button type="button" className={mapClass("info-close")} aria-label="Close pharmacy details" onClick={() => {

@@ -22,13 +22,13 @@ export function useLandingSectionMotion(ref: RefObject<HTMLElement>) {
     function draw() {
       frame = 0;
       if (document.hidden) return;
+      const still = reducedMotion.matches || compact.matches;
       // Batch geometry reads before writing styles to avoid repeated layout work.
       const updates = stages.map(stage => ({
         stage,
-        ...sectionRevealFrame(stage.getBoundingClientRect().top, window.innerHeight, compact.matches),
+        ...sectionRevealFrame(still ? 0 : stage.getBoundingClientRect().top, window.innerHeight, compact.matches),
       }));
       updates.forEach(({ stage, scale, radius, shadow, progress }) => {
-        const still = reducedMotion.matches;
         stage.style.setProperty("--section-scale", String(still ? 1 : scale));
         stage.style.setProperty("--section-radius", `${still ? 0 : radius}px`);
         stage.style.setProperty("--section-shadow", String(still ? 0 : shadow));

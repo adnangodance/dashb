@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, ChevronDown, Tag, X } from "lucide-react";
+import { ScrollableTabs } from "./responsive-ui";
 
 export function CartVoucherField({ patientName, appliedCode, discount, itemCount = 1, onApply, onRemove }: {
   patientName?: string;
@@ -61,7 +62,7 @@ export function CartVoucherField({ patientName, appliedCode, discount, itemCount
         ) : (
           <div>
             <div className="flex items-center gap-2">
-              <input ref={inputRef} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); apply(); } }} aria-label={`Voucher code${target}`} aria-describedby={patientName ? `${id}-hint` : undefined} placeholder="Enter voucher code" maxLength={40} autoComplete="off" spellCheck={false} className="h-[34px] w-full min-w-0 rounded-[8px] border border-[#d9d9d9] bg-white px-3 text-[12px] uppercase text-[#202020] outline-none placeholder:normal-case placeholder:text-[#999] focus:border-[#555] focus:ring-1 focus:ring-[#555]" />
+              <input ref={inputRef} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); apply(); } }} aria-label={`Voucher code${target}`} aria-describedby={patientName ? `${id}-hint` : undefined} placeholder="Enter voucher code" maxLength={40} autoCapitalize="characters" enterKeyHint="done" autoComplete="off" spellCheck={false} className="h-[34px] w-full min-w-0 rounded-[8px] border border-[#d9d9d9] bg-white px-3 text-[12px] uppercase text-[#202020] outline-none placeholder:normal-case placeholder:text-[#999] focus:border-[#555] focus:ring-1 focus:ring-[#555]" />
               <button type="button" onClick={apply} disabled={!draft.trim()} aria-label={`${editing ? "Save" : "Apply"} voucher${target}`} className="h-[34px] shrink-0 rounded-full bg-[#171717] px-4 text-[11px] font-medium text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:bg-[#f1f1f1] disabled:text-[#aaa]">{editing ? "Save" : "Apply"}</button>
             </div>
             {editing && <div className="mt-1.5 text-right"><button type="button" aria-label={`Cancel voucher edit${target}`} onClick={() => { setDraft(appliedCode ?? ""); setEditing(false); setFocusEdit(true); }} className="text-[11px] font-medium text-[#777] hover:text-black hover:underline">Cancel</button></div>}
@@ -134,6 +135,8 @@ export function OrderTotalVouchers({ patients, onChange, afterApply }: {
             aria-describedby={`${id}-scope`}
             placeholder="Enter voucher code"
             maxLength={40}
+            autoCapitalize="characters"
+            enterKeyHint="done"
             autoComplete="off"
             spellCheck={false}
             className="h-[34px] w-full min-w-0 rounded-[8px] border border-[#d9d9d9] bg-white px-3 text-[12px] uppercase text-[#202020] outline-none placeholder:normal-case placeholder:text-[#999] focus:border-[#555] focus:ring-1 focus:ring-[#555]"
@@ -141,7 +144,7 @@ export function OrderTotalVouchers({ patients, onChange, afterApply }: {
         </div>
         <div>
           <p id={`${id}-scope`} className="mb-2 text-[11px] font-medium leading-[16px] text-[#777]">Apply voucher to</p>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Choose patients for voucher">
+          <ScrollableTabs desktopLayout="wrap" className="flex gap-1.5" role="group" aria-label="Choose patients for voucher">
             <button type="button" onClick={() => setSelectedKeys(null)} aria-pressed={allSelected} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors ${allSelected ? "border-[#171717] bg-[#171717] text-white" : "border-[#e3e3e3] bg-white text-[#666] hover:border-[#aaa] hover:text-[#171717]"}`}>
               {allSelected && <CheckCircle2 size={12} className="shrink-0" aria-hidden="true" />}
               All {patients.length} patients
@@ -155,9 +158,9 @@ export function OrderTotalVouchers({ patients, onChange, afterApply }: {
                 </button>
               );
             })}
-          </div>
+          </ScrollableTabs>
         </div>
-        <button type="button" onClick={apply} disabled={!canApply} className="min-h-[36px] w-full rounded-full bg-[#171717] px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:bg-[#f1f1f1] disabled:text-[#aaa]">{applyLabel}</button>
+        <button type="button" onClick={apply} disabled={!canApply} className="min-h-11 w-full rounded-full bg-[#171717] px-4 py-2 text-[12px] font-medium text-white transition-colors hover:bg-[#333] disabled:cursor-not-allowed disabled:bg-[#f1f1f1] disabled:text-[#aaa]">{applyLabel}</button>
         {afterApply}
         {normalizedCode && (
           <div>
@@ -178,9 +181,9 @@ export function OrderTotalVouchers({ patients, onChange, afterApply }: {
             </div>
           </div>
         ) : appliedPatients.length > 0 && (
-          <div className="flex flex-wrap gap-2" aria-label="Applied patient vouchers">
+          <ScrollableTabs desktopLayout="wrap" className="flex gap-2" aria-label="Applied patient vouchers">
             {appliedPatients.map(patient => (
-              <div key={patient.key} className="inline-flex max-w-full items-center rounded-full bg-[#f0f8f2] text-[#287343]">
+              <div data-scroll-item key={patient.key} className="inline-flex max-w-full items-center rounded-full bg-[#f0f8f2] text-[#287343]">
                 <button type="button" aria-label={`Edit voucher for ${patient.name}`} onClick={() => { setDraft(patient.code ?? ""); setSelectedKeys(new Set([patient.key])); inputRef.current?.focus(); }} className="flex min-w-0 items-center gap-1.5 rounded-l-full py-1.5 pl-2.5 pr-1 text-left text-[10px] hover:underline">
                   <CheckCircle2 size={12} className="shrink-0" />
                   <span className="break-words">{patient.name} · <span className="break-all font-medium">{patient.code}</span></span>
@@ -188,7 +191,7 @@ export function OrderTotalVouchers({ patients, onChange, afterApply }: {
                 <button type="button" aria-label={`Remove voucher for ${patient.name} in Order Total`} onClick={() => { onChange(patient.key, null); setAnnouncement(`Voucher removed from ${patient.name}.`); inputRef.current?.focus(); }} className="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-[#e0f0e5]"><X size={12} /></button>
               </div>
             ))}
-          </div>
+          </ScrollableTabs>
         )}
         <p className="sr-only" role="status">{announcement}</p>
       </div>

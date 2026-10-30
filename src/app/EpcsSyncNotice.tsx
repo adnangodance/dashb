@@ -1,3 +1,6 @@
+import { MobilePageHeader } from "./MobilePageHeader";
+import { useBodyScrollLock, useMediaQuery } from "./responsive-ui";
+import { inputMetadata } from "./form-input";
 import { useEffect, useRef, useState, type FormEvent, type HTMLInputTypeAttribute } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRight, ArrowUpRight, CheckCircle2, Info, Loader2, RefreshCw, X } from "lucide-react";
@@ -112,6 +115,8 @@ export function EpcsSyncNotice(props: Props) {
 }
 
 function EpcsProfileDrawer({ account, onSave, onSynced, syncProfile, onClose }: Props & { onClose: () => void }) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
+  useBodyScrollLock(true);
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -174,10 +179,11 @@ function EpcsProfileDrawer({ account, onSave, onSynced, syncProfile, onClose }: 
       className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-full max-w-[680px] overflow-hidden rounded-l-[16px] border-0 bg-white p-0 font-['Inter',sans-serif] text-[#171717] shadow-[-18px_0_55px_rgba(0,0,0,0.16)] outline-none backdrop:bg-black/30 backdrop:backdrop-blur-[2px]"
     >
       <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-l-[16px] border-l border-[#e4e1dd] bg-white">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece9e5] px-6 py-5">
+        <MobilePageHeader title="Sync your EPCS account" onBack={onClose} titleId="epcs-profile-title" titleRef={heading} subtitle={<span id="epcs-profile-description">Review your personal, prescriber, and contact information before syncing to DoseSpot.</span>} className="mobile-sheet-header" backDisabled={busy} />
+        <header className="max-lg:hidden flex shrink-0 items-start justify-between gap-4 border-b border-[#ece9e5] px-6 py-5">
           <div className="min-w-0 flex-1">
-            <h2 ref={heading} tabIndex={-1} id="epcs-profile-title" className="text-[20px] font-semibold outline-none">Sync your EPCS account</h2>
-            <p id="epcs-profile-description" className="mt-1 text-[11px] leading-5 text-[#777]">Review your personal, prescriber, and contact information before syncing to DoseSpot.</p>
+            <h2 ref={compactNavigation ? undefined : heading} tabIndex={-1} id={compactNavigation ? undefined : "epcs-profile-title"} className="text-[20px] font-semibold outline-none">Sync your EPCS account</h2>
+            <p id={compactNavigation ? undefined : "epcs-profile-description"} className="mt-1 text-[11px] leading-5 text-[#777]">Review your personal, prescriber, and contact information before syncing to DoseSpot.</p>
           </div>
           <button type="button" disabled={busy} onClick={onClose} aria-label="Close EPCS profile" className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#777] hover:bg-[#f4f2ef] disabled:opacity-40"><X size={18} /></button>
         </header>
@@ -202,7 +208,7 @@ function EpcsProfileDrawer({ account, onSave, onSynced, syncProfile, onClose }: 
                       return (
                         <label key={field.key} className="block text-[11px] font-medium text-[#242424]">
                           <span>{field.label}{optional ? <span className="ml-1.5 text-[10px] font-normal text-[#999]">Optional</span> : <span className="ml-1 text-[#b44b42]" aria-hidden="true">*</span>}</span>
-                          <input
+                          <input {...inputMetadata(field.key)}
                             name={field.key}
                             type={("type" in field ? field.type : "text") as HTMLInputTypeAttribute}
                             value={profile[field.key]}

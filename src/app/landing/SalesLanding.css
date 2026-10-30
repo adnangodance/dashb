@@ -1,0 +1,10 @@
+.slrx-sales { padding-bottom: 0; background: #fff; }
+.slrx-sales .slrx-hero-account { margin-left: auto; }
+.slrx-sales .slrx-launch-backdrop-cap { height: 130%; }
+.slrx-sales .slrx-launch-hero { justify-content: center; min-height: 100svh; padding: calc(104px + env(safe-area-inset-top, 0px)) 24px 48px; }
+.slrx-sales .slrx-launch-apply { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 58px; padding: 16px 20px; border-radius: 16px; background: var(--slrx-action-blue); color: #fff; font-size: 16px; font-weight: 500; line-height: 24px; transition: background-color .2s cubic-bezier(.4, 0, .2, 1); }
+.slrx-sales .slrx-launch-apply:hover { background: #1c36a8; }
+
+@media (max-width: 767px) {
+  .slrx-sales .slrx-launch-hero { padding: calc(96px + env(safe-area-inset-top, 0px)) 16px 32px; }
+}

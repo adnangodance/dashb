@@ -1,3 +1,6 @@
+import { MobilePageHeader } from "./MobilePageHeader";
+import { ScrollableTabs, useBodyScrollLock, useMediaQuery } from "./responsive-ui";
+import { inputMetadata } from "./form-input";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle2, X } from "lucide-react";
@@ -6,6 +9,8 @@ type Props = { pharmacy: string; onClose: () => void; onComplete: () => void };
 const steps = ["Prescriber", "Practice", "Additional details", "Review & sign"];
 
 export function EnrollmentModal({ pharmacy, onClose, onComplete }: Props) {
+  const compactNavigation = useMediaQuery("(max-width: 1023px)");
+  useBodyScrollLock(true);
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState(0);
@@ -15,9 +20,7 @@ export function EnrollmentModal({ pharmacy, onClose, onComplete }: Props) {
 
   useEffect(() => {
     dialog.current?.showModal();
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
+
   }, []);
   useEffect(() => { heading.current?.focus(); }, [step, completed]);
 
@@ -25,17 +28,17 @@ export function EnrollmentModal({ pharmacy, onClose, onComplete }: Props) {
   const field = (name: string, label: string, required = false, type = "text", wide = false) => (
     <label key={name} className={`block text-[12px] font-medium text-[#171717] ${wide ? "sm:col-span-2" : ""}`}>
       {label}{required && <span className="ml-1 text-[#b4473d]">*</span>}
-      <input name={name} placeholder={type === "date" ? undefined : `Enter ${label.toLowerCase()}`} type={type} min={type === "number" ? 0 : undefined} required={required} value={values[name] ?? ""} onChange={event => update(name, event.target.value)} className={inputClass} {...(name === "npi" || name === "collaboratorNpi" ? { inputMode: "numeric" as const, pattern: "[0-9]{10}", title: "Enter a 10-digit NPI number" } : {})} />
+      <input {...inputMetadata(String(name))} name={name} placeholder={type === "date" ? undefined : `Enter ${label.toLowerCase()}`} type={type} min={type === "number" ? 0 : undefined} required={required} value={values[name] ?? ""} onChange={event => update(name, event.target.value)} className={inputClass} {...(name === "npi" || name === "collaboratorNpi" ? { inputMode: "numeric" as const, pattern: "[0-9]{10}", title: "Enter a 10-digit NPI number" } : {})} />
     </label>
   );
   const choice = (name: string, label: string, options: string[]) => (
     <fieldset className="sm:col-span-2">
       <legend className="mb-2 text-[12px] font-medium leading-5 text-[#171717]">{label}</legend>
-      <div className="flex flex-wrap gap-2">{options.map(option => (
+      <ScrollableTabs activeKey={values[name]} desktopLayout="wrap" className="flex gap-2" aria-label={label}>{options.map(option => (
         <label key={option} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-[12px] ${values[name] === option ? "border-[#3974d8] bg-[#eff6ff] text-[#1d4ed8]" : "border-[#d1d5db] text-[#6b7280]"}`}>
           <input type="radio" name={name} value={option} checked={values[name] === option} onChange={() => update(name, option)} className="accent-[#3974d8]" />{option}
         </label>
-      ))}</div>
+      ))}</ScrollableTabs>
     </fieldset>
   );
   function submit(event: FormEvent) {
@@ -47,9 +50,10 @@ export function EnrollmentModal({ pharmacy, onClose, onComplete }: Props) {
   return createPortal(
     <dialog ref={dialog} onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }} aria-labelledby="enrollment-title" className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-full max-w-[680px] overflow-hidden rounded-l-[16px] border-0 bg-white p-0 text-[#171717] shadow-[-18px_0_55px_rgba(0,0,0,0.16)] outline-none backdrop:bg-black/30 backdrop:backdrop-blur-[2px]">
       <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-l-[16px] border-l border-[#e4e1dd] bg-white">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#ece9e5] px-6 py-5">
+        <MobilePageHeader title={completed ? "Enrollment Complete" : ["Prescriber Information", "Practice Information", "Additional Details", "Review & Sign"][step]} onBack={onClose} titleId="enrollment-title" titleRef={heading} subtitle={`503B enrollment for ${pharmacy}${completed ? "" : ` · Step ${step + 1} of ${steps.length}`}`} className="mobile-sheet-header"  />
+        <header className="max-lg:hidden flex shrink-0 items-start justify-between gap-4 border-b border-[#ece9e5] px-6 py-5">
           <div className="min-w-0">
-            <h2 id="enrollment-title" ref={heading} tabIndex={-1} className="text-[20px] font-semibold outline-none">{completed ? "Enrollment Complete" : ["Prescriber Information", "Practice Information", "Additional Details", "Review & Sign"][step]}</h2>
+            <h2 id={compactNavigation ? undefined : "enrollment-title"} ref={compactNavigation ? undefined : heading} tabIndex={-1} className="text-[20px] font-semibold outline-none">{completed ? "Enrollment Complete" : ["Prescriber Information", "Practice Information", "Additional Details", "Review & Sign"][step]}</h2>
             <p className="mt-1 text-[11px] leading-5 text-[#777]">503B enrollment for {pharmacy}</p>
             {!completed && <p aria-live="polite" className="mt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3974d8]">Step {step + 1} of {steps.length}</p>}
           </div>

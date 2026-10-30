@@ -94,7 +94,8 @@ export async function createInjectionScene(host: HTMLElement, onContextLost: () 
     if (!label?.map) throw new Error("Bottle label texture could not be decoded.");
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "low-power" });
     const webgl = renderer;
-    webgl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const compact = window.matchMedia("(max-width: 1023px)").matches;
+    webgl.setPixelRatio(Math.min(window.devicePixelRatio || 1, compact ? 1.5 : 2));
     webgl.setClearColor(0x000000, 0);
     webgl.toneMapping = THREE.ACESFilmicToneMapping;
     webgl.toneMappingExposure = 1;
@@ -147,9 +148,9 @@ export async function createInjectionScene(host: HTMLElement, onContextLost: () 
     const liquidBase = -1.57;
     const liquidRange = 2.10;
     const liquidMaterial = new THREE.MeshPhysicalMaterial({ color: 0xc2d8df, roughness: 0.08, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1 });
-    const liquid = mesh(new THREE.CylinderGeometry(0.86, 0.86, 1, 96), liquidMaterial);
+    const liquid = mesh(new THREE.CylinderGeometry(0.86, 0.86, 1, compact ? 48 : 96), liquidMaterial);
     const meniscusMaterial = new THREE.MeshPhysicalMaterial({ color: 0xd7e6df, roughness: 0.06, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
-    const meniscus = mesh(new THREE.CircleGeometry(0.858, 96), meniscusMaterial);
+    const meniscus = mesh(new THREE.CircleGeometry(0.858, compact ? 48 : 96), meniscusMaterial);
     meniscus.rotation.x = -Math.PI / 2;
 
     const shadowCanvas = document.createElement("canvas");

@@ -14,6 +14,7 @@ export function FooterWordmark() {
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const compact = window.matchMedia("(max-width: 999px)");
     const masks = art.querySelectorAll<SVGCircleElement>("[data-pointer-mask]");
     let visible = false;
     let frame = 0;
@@ -30,6 +31,7 @@ export function FooterWordmark() {
     function draw(time: number) {
       frame = 0;
       if (!visible || document.hidden) return;
+      if (reducedMotion.matches || compact.matches) { art!.style.transform = "none"; return; }
       const delta = Math.min(time - (previousTime || time - 16), 64);
       previousTime = time;
       const bounds = stage!.getBoundingClientRect();
@@ -70,7 +72,7 @@ export function FooterWordmark() {
     }
 
     function updateMotionPreference() {
-      if (reducedMotion.matches) {
+      if (reducedMotion.matches || compact.matches) {
         hasPointer = false;
         offset = 0;
         art!.style.transform = "none";
@@ -87,7 +89,7 @@ export function FooterWordmark() {
       } else {
         cancelAnimationFrame(frame);
         frame = 0;
-        offset = reducedMotion.matches ? 0 : footerRevealOffset(entry.boundingClientRect.top, entry.boundingClientRect.height, window.innerHeight);
+        offset = reducedMotion.matches || compact.matches ? 0 : footerRevealOffset(entry.boundingClientRect.top, entry.boundingClientRect.height, window.innerHeight);
         art.style.transform = `translateY(${offset}px)`;
       }
     });
@@ -100,6 +102,7 @@ export function FooterWordmark() {
     window.addEventListener("resize", requestFrame, { passive: true });
     reducedMotion.addEventListener("change", updateMotionPreference);
     finePointer.addEventListener("change", updateMotionPreference);
+    compact.addEventListener("change", updateMotionPreference);
     updateMotionPreference();
 
     return () => {
@@ -112,6 +115,7 @@ export function FooterWordmark() {
       window.removeEventListener("resize", requestFrame);
       reducedMotion.removeEventListener("change", updateMotionPreference);
       finePointer.removeEventListener("change", updateMotionPreference);
+      compact.removeEventListener("change", updateMotionPreference);
     };
   }, []);
 

@@ -1,0 +1,83 @@
+/* Centered hero. Scoped so the Sales page keeps the shared .slrx-hero styles. */
+.slrx-landing-intro.slrx-landing-intro-centered { --slrx-intro-background: #fff; --slrx-intro-ink: #0b0b0b; --slrx-hero-muted: #6c7686; --slrx-hero-accent: #0d9467; isolation: auto; }
+
+.slrx-hero.slrx-hero-centered { position: static; isolation: auto; overflow: hidden; color: var(--slrx-intro-ink); font-family: "Geist Variable", var(--slrx-interface-font); }
+.slrx-hero-centered .slrx-hero-header { position: fixed; top: 0; right: 0; left: 0; z-index: 50; border-bottom: 1px solid #e3e5e9; background: rgb(255 255 255 / .8); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.slrx-hero.slrx-hero-centered .slrx-hero-navigation { gap: 0; width: min(1200px, calc(100% - 48px)); max-width: none; height: calc(80px + env(safe-area-inset-top, 0px)); padding-inline: 0; }
+.slrx-hero-centered .slrx-hero-desktop-links { gap: 8px; margin-left: auto; }
+.slrx-hero-centered .slrx-hero-account { gap: 8px; margin-left: 32px; }
+.slrx-hero.slrx-hero-centered .slrx-hero-desktop-links a,
+.slrx-hero.slrx-hero-centered .slrx-hero-login,
+.slrx-hero.slrx-hero-centered .slrx-hero-register { min-height: 48px; padding: 12px 16px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--slrx-intro-ink); font-family: inherit; font-size: 16px; font-weight: 400; transition: color .3s cubic-bezier(.4, 0, .2, 1); }
+.slrx-hero.slrx-hero-centered .slrx-hero-desktop-links a:hover,
+.slrx-hero.slrx-hero-centered .slrx-hero-login:hover,
+.slrx-hero.slrx-hero-centered .slrx-hero-register:hover { background: transparent; box-shadow: none; color: rgb(11 11 11 / .8); }
+.slrx-hero.slrx-hero-centered .slrx-hero-login,
+.slrx-hero.slrx-hero-centered .slrx-hero-register { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 14px; border: 1px solid #d5d8de; border-radius: 10px; font-size: 15px; font-weight: 500; line-height: 20px; transition: background-color .2s cubic-bezier(.4, 0, .2, 1), border-color .2s cubic-bezier(.4, 0, .2, 1); }
+.slrx-hero.slrx-hero-centered .slrx-hero-login { background: #fff; }
+.slrx-hero.slrx-hero-centered .slrx-hero-login:hover { background: #f6f7f9; color: var(--slrx-intro-ink); }
+.slrx-hero.slrx-hero-centered .slrx-hero-register { border-color: var(--slrx-action-blue); background: var(--slrx-action-blue); color: #fff; }
+.slrx-hero.slrx-hero-centered .slrx-hero-register:hover { border-color: #1c36a8; background: #1c36a8; color: #fff; }
+
+/* Sized by the intro, not the hero, so the gradient runs on behind the trust section. */
+.slrx-landing-intro-centered .slrx-trust-section { position: relative; z-index: 1; }
+.slrx-launch-backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.slrx-launch-backdrop-glow { position: absolute; inset: 0; background: radial-gradient(90% 80% at 50% 100%, #e6ecff 0%, #bccbff 45%, #86a0ee 100%); opacity: .4; }
+.slrx-launch-backdrop-stripes { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgb(255 255 255 / .78) 0 1px, transparent 1px 8px); opacity: .4; }
+.slrx-launch-backdrop-cap { position: absolute; top: 0; left: -150%; width: 400%; height: 1198px; background: radial-gradient(70% 106.667% at 50% 0%, #fff 32%, transparent 64%); transform-origin: top; will-change: transform; }
+
+.slrx-launch-hero { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding: calc(189px + env(safe-area-inset-top, 0px)) 24px 235px; text-align: center; }
+.slrx-stat-badge-slot { display: grid; place-items: center; min-height: 36px; margin-bottom: 24px; }
+.slrx-stat-badge { position: relative; grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #e3e5e9; font-size: 14px; line-height: 20px; white-space: nowrap; }
+.slrx-stat-badge::before { content: ""; position: absolute; inset: -1px; padding: 1px; border-radius: inherit; background: conic-gradient(from var(--slrx-badge-beam-angle) in oklch, #a3ece900, #a3ece9 20deg, #709ff5 100deg, #709ff500 120deg); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); animation: slrx-badge-beam 4s linear infinite; }
+@property --slrx-badge-beam-angle { syntax: "<angle>"; inherits: false; initial-value: -80deg; }
+@keyframes slrx-badge-beam { to { --slrx-badge-beam-angle: 280deg; } }
+.slrx-stat-badge strong { color: var(--slrx-hero-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.slrx-stat-badge[data-animate="false"][data-state="exit"] { opacity: 0; }
+.slrx-stat-badge[data-animate="true"][data-state="enter"] { animation: slrx-stat-badge-enter .5s ease both; }
+.slrx-stat-badge[data-animate="true"][data-state="exit"] { animation: slrx-stat-badge-exit .5s ease both; }
+@keyframes slrx-stat-badge-enter { from { filter: blur(4px); opacity: 0; translate: 0 40px; } to { filter: blur(0); opacity: 1; translate: 0; } }
+@keyframes slrx-stat-badge-exit { from { filter: blur(0); opacity: 1; translate: 0; } to { filter: blur(4px); opacity: 0; translate: 0 -40px; } }
+
+.slrx-landing .slrx-launch-heading { max-width: 760px; margin-bottom: 12px; color: var(--slrx-intro-ink); font-family: inherit; font-size: 60px; font-weight: 400; line-height: 1; letter-spacing: -.03em; }
+.slrx-launch-heading > span { display: block; }
+.slrx-launch-heading em { color: #1c36a8; font-style: normal; }
+.slrx-launch-pills { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-bottom: 40px; }
+.slrx-launch-pills span { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 999px; background: rgb(0 0 0 / .04); font-size: 14px; line-height: 20px; }
+
+.slrx-launch-field-wrap { position: relative; width: min(400px, 100%); }
+.slrx-launch-field { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 20px; border: 1px solid #161616; border-radius: 16px; background: #fff; box-shadow: 0 0 0 2px #161616; }
+.slrx-launch-input { position: relative; display: flex; flex: 1; min-width: 0; }
+.slrx-launch-input img { position: absolute; top: 50%; left: 50%; width: 124px; height: 24px; translate: -50% -50%; pointer-events: none; }
+.slrx-launch-field input { flex: 1; min-width: 0; padding: 12px 0; border: 0; outline: 0; background: transparent; color: var(--slrx-intro-ink); font: inherit; font-size: 16px; line-height: 24px; text-align: center; }
+.slrx-launch-submit { display: none; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: rgb(0 0 0 / .04); color: var(--slrx-hero-muted); font: inherit; font-weight: 500; transition: all .3s cubic-bezier(.4, 0, .2, 1); }
+.slrx-launch-submit:enabled { background: #161616; color: #fff; }
+.slrx-launch-submit:enabled:hover { scale: 1.05; }
+.slrx-launch-submit:disabled { cursor: not-allowed; }
+.slrx-hero.slrx-hero-centered .slrx-launch-secondary { min-height: 20px; margin-top: 16px; color: var(--slrx-hero-muted); font-size: 14px; line-height: 20px; transition: color .3s cubic-bezier(.4, 0, .2, 1); }
+.slrx-launch-secondary:hover { color: var(--slrx-intro-ink); }
+.slrx-hero.slrx-hero-centered .slrx-launch-description { max-width: 560px; margin-top: 40px; color: var(--slrx-hero-muted); font-size: 18px; line-height: 28px; }
+
+.slrx-particle-field { position: absolute; top: 50%; width: max(480px, calc(50vw - 200px)); height: 800px; translate: 0 -50%; pointer-events: none; }
+.slrx-particle-field-left { right: 100%; }
+.slrx-particle-field-right { left: 100%; }
+
+@media (max-width: 999px) {
+  .slrx-hero.slrx-hero-centered .slrx-hero-navigation { width: calc(100% - 32px); height: calc(72px + env(safe-area-inset-top, 0px)); }
+  .slrx-hero-centered .slrx-hero-account { margin-left: auto; }
+}
+@media (max-width: 767px) {
+  .slrx-hero.slrx-hero-centered .slrx-hero-register, .slrx-hero.slrx-hero-centered .slrx-hero-login { display: none; }
+  .slrx-launch-hero { padding: calc(114px + env(safe-area-inset-top, 0px)) 16px 120px; }
+  .slrx-landing .slrx-launch-heading { font-size: 36px; line-height: 1.05; }
+  .slrx-launch-field-wrap { width: 100%; }
+  .slrx-launch-field { flex-direction: column; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  .slrx-launch-input { flex: none; width: 100%; }
+  .slrx-launch-field input { width: 100%; flex: none; padding: 16px 20px; border: 1px solid #161616; border-radius: 16px; background: #fff; box-shadow: 0 0 0 2px #161616; }
+  .slrx-launch-submit { display: inline-flex; width: 100%; height: 48px; margin-top: 8px; border-radius: 14px; font-size: 16px; }
+  .slrx-particle-field { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slrx-launch-submit:enabled:hover { scale: none; }
+  .slrx-stat-badge::before { animation: none; }
+}

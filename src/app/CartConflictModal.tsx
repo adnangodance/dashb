@@ -1,3 +1,4 @@
+import { useBodyScrollLock } from "./responsive-ui";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRightLeft, Info, X } from "lucide-react";
@@ -8,15 +9,14 @@ export function CartConflictModal({ conflict, onClose, onClear }: {
   onClose: () => void;
   onClear: () => void;
 }) {
+  useBodyScrollLock(true);
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     dialog.current?.showModal();
     heading.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousOverflow; };
+
   }, []);
 
   return createPortal(
