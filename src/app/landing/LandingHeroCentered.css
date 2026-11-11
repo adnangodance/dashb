@@ -19,13 +19,40 @@
 .slrx-hero.slrx-hero-centered .slrx-hero-register { border-color: var(--slrx-action-blue); background: var(--slrx-action-blue); color: #fff; }
 .slrx-hero.slrx-hero-centered .slrx-hero-register:hover { border-color: #1c36a8; background: #1c36a8; color: #fff; }
 
-/* Sized by the intro, not the hero, so the gradient runs on behind the trust section. */
-.slrx-landing-intro-centered .slrx-trust-section { position: relative; z-index: 1; }
+/* Transparent bar at the top of the page that tightens into a floating dark pill once scrolled. */
+.slrx-hero.slrx-hero-centered .slrx-float-header { --slrx-float-ink: var(--slrx-intro-ink); --slrx-float-ease: cubic-bezier(.22, 1, .36, 1); --slrx-float-time: .6s; padding: calc(22px + env(safe-area-inset-top, 0px)) 0 22px; border-bottom: 0; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; pointer-events: none; transition: padding var(--slrx-float-time) var(--slrx-float-ease); }
+.slrx-float-row { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 134px); max-width: 1302px; margin-inline: auto; pointer-events: auto; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-navigation { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: minmax(0, 1fr); align-items: center; flex: 1 1 auto; gap: 0; width: auto; min-width: 0; max-width: 1302px; height: 38px; margin: 0; padding: 0; border-radius: 999px; transition: max-width var(--slrx-float-time) var(--slrx-float-ease), height var(--slrx-float-time) var(--slrx-float-ease), padding var(--slrx-float-time) var(--slrx-float-ease), background-color var(--slrx-float-time) var(--slrx-float-ease), -webkit-backdrop-filter var(--slrx-float-time) var(--slrx-float-ease), backdrop-filter var(--slrx-float-time) var(--slrx-float-ease); }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-desktop-links { gap: 22px; margin: 0; justify-self: start; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-desktop-links a,
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-login { min-height: 0; padding: 0; border: 0; background: transparent; color: var(--slrx-float-ink); font-size: 14px; font-weight: 400; line-height: 20px; transition: color var(--slrx-float-time) var(--slrx-float-ease), opacity .15s ease-out; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-desktop-links a:hover,
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-login:hover { background: transparent; color: var(--slrx-float-ink); opacity: .7; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-brand { justify-self: center; color: var(--slrx-float-ink); font-size: 18px; transition: color var(--slrx-float-time) var(--slrx-float-ease), gap var(--slrx-float-time) var(--slrx-float-ease), scale var(--slrx-float-time) var(--slrx-float-ease); }
+.slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] .slrx-hero-brand { gap: 0; scale: .894; }
+.slrx-float-header .slrx-hero-brand img { width: 27px; transition: width var(--slrx-float-time) var(--slrx-float-ease), opacity calc(var(--slrx-float-time) / 2) ease; }
+.slrx-float-header[data-scrolled="true"] .slrx-hero-brand img { width: 0; opacity: 0; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-account { gap: 16px; margin: 0; justify-self: end; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-register { min-height: 38px; padding: 9px 18px; border: 0; border-radius: 999px; font-size: 14px; font-weight: 400; transition: background-color var(--slrx-float-time) var(--slrx-float-ease), color var(--slrx-float-time) var(--slrx-float-ease), min-height var(--slrx-float-time) var(--slrx-float-ease), scale .15s ease-out; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-register:hover { scale: 1.03; }
+.slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-menu-toggle { display: grid; flex: none; width: 38px; height: 38px; border-radius: 999px; color: var(--slrx-float-ink); transition: width var(--slrx-float-time) var(--slrx-float-ease), height var(--slrx-float-time) var(--slrx-float-ease), background-color var(--slrx-float-time) var(--slrx-float-ease), -webkit-backdrop-filter var(--slrx-float-time) var(--slrx-float-ease), backdrop-filter var(--slrx-float-time) var(--slrx-float-ease), color var(--slrx-float-time) var(--slrx-float-ease); }
+@media (min-width: 1000px) {
+  .slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-navigation,
+  .slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-menu-toggle { background: rgb(255 255 255 / 0); -webkit-backdrop-filter: blur(0) saturate(100%); backdrop-filter: blur(0) saturate(100%); }
+  .slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] { padding-block: calc(15px + env(safe-area-inset-top, 0px)) 15px; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] .slrx-hero-navigation { max-width: 840px; height: 46px; padding: 6px 6px 6px 22px; background: rgb(255 255 255 / .86); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); }
+  .slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] .slrx-hero-menu-toggle:hover { background: #fff; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] .slrx-hero-register { min-height: 34px; padding-block: 7px; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] .slrx-hero-menu-toggle { width: 46px; height: 46px; background: rgb(255 255 255 / .86); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); }
+}
+
+/* Keep the animated backdrop inside the hero's intro wrapper. */
 .slrx-launch-backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .slrx-launch-backdrop-glow { position: absolute; inset: 0; background: radial-gradient(90% 80% at 50% 100%, #e6ecff 0%, #bccbff 45%, #86a0ee 100%); opacity: .4; }
 .slrx-launch-backdrop-stripes { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgb(255 255 255 / .78) 0 1px, transparent 1px 8px); opacity: .4; }
 .slrx-launch-backdrop-cap { position: absolute; top: 0; left: -150%; width: 400%; height: 1198px; background: radial-gradient(70% 106.667% at 50% 0%, #fff 32%, transparent 64%); transform-origin: top; will-change: transform; }
 
+.slrx-hero-centered .injection-experience { margin-top: calc(82px + env(safe-area-inset-top, 0px)); margin-bottom: 0; }
 .slrx-launch-hero { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding: calc(189px + env(safe-area-inset-top, 0px)) 24px 235px; text-align: center; }
 .slrx-stat-badge-slot { display: grid; place-items: center; min-height: 36px; margin-bottom: 24px; }
 .slrx-stat-badge { position: relative; grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #e3e5e9; font-size: 14px; line-height: 20px; white-space: nowrap; }
@@ -65,9 +92,16 @@
 @media (max-width: 999px) {
   .slrx-hero.slrx-hero-centered .slrx-hero-navigation { width: calc(100% - 32px); height: calc(72px + env(safe-area-inset-top, 0px)); }
   .slrx-hero-centered .slrx-hero-account { margin-left: auto; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header { padding: env(safe-area-inset-top, 0px) 0 0; transition: background-color var(--slrx-float-time) var(--slrx-float-ease); }
+  .slrx-hero.slrx-hero-centered .slrx-float-header[data-scrolled="true"] { background: rgb(255 255 255 / .8); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .slrx-float-row { width: calc(100% - 32px); height: 72px; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-navigation { grid-template-columns: auto 1fr; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-brand { justify-self: start; transform-origin: left center; }
 }
 @media (max-width: 767px) {
   .slrx-hero.slrx-hero-centered .slrx-hero-register, .slrx-hero.slrx-hero-centered .slrx-hero-login { display: none; }
+  .slrx-hero.slrx-hero-centered .slrx-float-header .slrx-hero-register { display: inline-flex; padding-inline: 16px; }
+  .slrx-hero-centered .injection-experience { margin-top: calc(84px + env(safe-area-inset-top, 0px)); }
   .slrx-launch-hero { padding: calc(114px + env(safe-area-inset-top, 0px)) 16px 120px; }
   .slrx-landing .slrx-launch-heading { font-size: 36px; line-height: 1.05; }
   .slrx-launch-field-wrap { width: 100%; }
@@ -78,6 +112,7 @@
   .slrx-particle-field { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .slrx-hero.slrx-hero-centered .slrx-float-header, .slrx-hero.slrx-hero-centered .slrx-float-header * { transition: none; }
   .slrx-launch-submit:enabled:hover { scale: none; }
   .slrx-stat-badge::before { animation: none; }
 }
