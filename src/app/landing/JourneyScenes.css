@@ -1,0 +1,185 @@
+/* Order journey product scenes. Shared tokens follow the landing palette. */
+.jsc-stage {
+  --jsc-ink: #17394b;
+  --jsc-muted: #627c92;
+  --jsc-line: #e3ebf1;
+  --jsc-indigo: #0d1251;
+  --jsc-ice: #e6eef6;
+  --jsc-green: #1f9d6b;
+  --jsc-green-soft: #dff5ea;
+  --jsc-ease: cubic-bezier(.22, 1, .36, 1);
+  position: relative;
+  flex: 1;
+  min-height: 316px;
+  overflow: hidden;
+  border: 1px solid #e4ecf1;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse 70% 60% at 20% 0%, #d9e9f7cc, transparent 70%),
+    radial-gradient(ellipse 60% 60% at 100% 100%, #d7eee9b3, transparent 70%),
+    linear-gradient(160deg, #f3f8fc, #f7faf9);
+  color: var(--jsc-ink);
+  font-family: var(--slrx-interface-font, "Geist Variable", sans-serif);
+  isolation: isolate;
+}
+.jsc-stage-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(#7595b533 1px, transparent 1.2px);
+  background-size: 18px 18px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 75% at 50% 50%, #000 30%, transparent 85%);
+  mask-image: radial-gradient(ellipse 80% 75% at 50% 50%, #000 30%, transparent 85%);
+}
+.jsc-layer { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity .45s ease, visibility 0s linear .45s; }
+.jsc-layer.is-active { opacity: 1; visibility: visible; transition: opacity .45s ease; }
+.jsc-scene { position: absolute; inset: 0; }
+
+/* Shared pieces */
+.jsc-card {
+  position: absolute;
+  border: 1px solid var(--jsc-line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px #0d12510a, 0 18px 40px -20px #244c7e47;
+}
+.jsc-label { display: inline-flex; align-items: center; gap: 6px; color: var(--jsc-muted); font-size: 10.5px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
+.jsc-card strong, .jsc-toast strong, .jsc-note strong, .jsc-badge strong, .jsc-eta strong { display: block; color: var(--jsc-ink); font-size: 13.5px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; }
+.jsc-card small, .jsc-toast small, .jsc-note small, .jsc-badge small, .jsc-eta small { display: block; margin-top: 2px; color: var(--jsc-muted); font-size: 11.5px; line-height: 1.35; }
+.jsc-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 7px;
+  border: 1px solid #ffffffcc;
+  border-radius: 999px;
+  background: #ffffffe6;
+  box-shadow: 0 12px 28px -14px #244c7e66;
+  color: var(--jsc-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.jsc-chip-icon { display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px; border-radius: 50%; background: var(--jsc-green-soft); color: var(--jsc-green); }
+.jsc-chip-blue { background: var(--jsc-ice); color: var(--jsc-indigo); }
+
+/* Entrance: only plays on the active layer, staggered by --d. */
+.is-active .jsc-in { animation: jsc-rise .7s var(--jsc-ease) both; animation-delay: var(--d, 0ms); }
+@keyframes jsc-rise { from { opacity: 0; transform: translateY(14px) scale(.97); filter: blur(4px); } }
+@keyframes jsc-pop { from { opacity: 0; transform: scale(.4); } }
+@keyframes jsc-fade { from { opacity: 0; } }
+@keyframes jsc-float { 50% { transform: translateY(-6px); } }
+
+/* 1 · Spot the need */
+.jsc-patient { top: 30px; left: 7%; width: 68%; padding: 16px 16px 14px; }
+.jsc-patient-head { display: flex; align-items: center; gap: 11px; padding-bottom: 13px; border-bottom: 1px solid #eef3f6; }
+.jsc-avatar { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #c9dcf0, #e3eef8); color: var(--jsc-indigo); font-size: 13px; font-weight: 700; }
+.jsc-rx { display: grid; gap: 8px; padding-top: 12px; }
+.jsc-rx-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--jsc-ink); font-size: 12.5px; font-weight: 500; }
+.jsc-rx-row em { padding: 3px 9px; border-radius: 999px; background: var(--jsc-ice); color: #315c86; font-size: 11px; font-style: normal; font-weight: 600; }
+.jsc-rx-muted { color: var(--jsc-muted); font-weight: 400; }
+.jsc-flag { padding: 3px 9px; border-radius: 999px; background: #fdf0e3; color: #b0651b; font-size: 11px; font-weight: 600; }
+.is-active .jsc-flag { animation: jsc-strike .5s ease 1.1s both; }
+@keyframes jsc-strike { to { background: #f1f4f7; color: #9aa8b5; text-decoration: line-through; } }
+.jsc-need-chip { right: 6%; bottom: 74px; }
+.jsc-orbit { position: absolute; left: 7%; bottom: 26px; display: flex; align-items: center; gap: 10px; }
+.jsc-orbit-logos { display: flex; }
+.jsc-orbit-logos img { width: 30px; height: 30px; margin-left: -8px; border: 2px solid #fff; border-radius: 50%; background: #fff; object-fit: cover; box-shadow: 0 4px 10px -4px #244c7e59; }
+.jsc-orbit-logos img:first-child { margin-left: 0; }
+.is-active .jsc-orbit-logos img { animation: jsc-pop .45s var(--jsc-ease) both; animation-delay: var(--d); }
+.jsc-orbit small { color: var(--jsc-muted); font-size: 11.5px; font-weight: 500; }
+
+/* 2 · Submit in clicks */
+.jsc-form { top: 24px; left: 50%; width: min(330px, 80%); padding: 14px 14px 16px; translate: -50% 0; }
+.jsc-form-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.jsc-timer { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: var(--jsc-ice); color: #315c86; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.jsc-field { position: relative; display: grid; grid-template-columns: 78px 1fr 18px; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border-radius: 10px; background: #f6f9fb; color: var(--jsc-muted); font-size: 11.5px; }
+.jsc-field + .jsc-field { margin-top: 6px; }
+.jsc-field strong { overflow: hidden; color: var(--jsc-ink); font-size: 12.5px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.jsc-field i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--jsc-green-soft); color: var(--jsc-green); }
+.is-active .jsc-field strong { animation: jsc-type .5s steps(14) both; animation-delay: var(--d); clip-path: inset(0 0 0 0); }
+@keyframes jsc-type { from { clip-path: inset(0 100% 0 0); } }
+.is-active .jsc-field i { animation: jsc-pop .35s var(--jsc-ease) both; animation-delay: calc(var(--d) + 420ms); }
+.jsc-send { display: flex; align-items: center; justify-content: center; gap: 8px; height: 38px; margin-top: 12px; border-radius: 999px; background: var(--jsc-indigo); color: #fff; font-size: 12.5px; font-weight: 600; }
+.is-active .jsc-send { animation: jsc-press .5s ease both; animation-delay: calc(var(--d) + 450ms); }
+@keyframes jsc-press { 40% { transform: scale(.96); background: #1b2370; } }
+.jsc-cursor { position: absolute; right: 26%; bottom: 4px; width: 18px; height: 18px; background: var(--jsc-ink); clip-path: polygon(0 0, 0 78%, 22% 60%, 38% 96%, 52% 90%, 37% 55%, 66% 55%); opacity: 0; }
+.is-active .jsc-cursor { animation: jsc-cursor 1.1s var(--jsc-ease) both; animation-delay: calc(var(--d) - 300ms); }
+@keyframes jsc-cursor { 0% { opacity: 0; transform: translate(40px, 40px); } 40% { opacity: 1; } 70% { transform: none; } 80% { transform: scale(.85); } 100% { opacity: 1; transform: none; } }
+.jsc-toast { position: absolute; right: 5%; bottom: 20px; display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 10px; border: 1px solid #cdeedd; border-radius: 14px; background: #ffffffeb; box-shadow: 0 16px 36px -16px #1f9d6b66; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+
+/* 3 · We compound it */
+.jsc-pedestal { position: absolute; left: 6%; top: 16px; width: 42%; height: 280px; }
+.jsc-pedestal img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 20px 22px #244c7e40); animation: jsc-float 5s ease-in-out infinite; }
+.jsc-pedestal-ring { position: absolute; left: 50%; bottom: 22px; width: 70%; height: 26px; border: 1px solid #9fc0dd66; border-radius: 50%; background: radial-gradient(ellipse, #a9c6e366, transparent 70%); translate: -50% 0; }
+.jsc-badge { position: absolute; top: 28px; right: 6%; display: flex; align-items: center; gap: 10px; padding: 9px 14px 9px 9px; border: 1px solid var(--jsc-line); border-radius: 14px; background: #fff; box-shadow: 0 14px 30px -18px #244c7e59; }
+.jsc-badge img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+.jsc-qa { right: 6%; bottom: 26px; width: 47%; padding: 14px 14px 10px; }
+.jsc-qa-row { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-top: 1px solid #eef3f6; color: var(--jsc-ink); font-size: 12.5px; font-weight: 500; }
+.jsc-qa .jsc-label { margin-bottom: 6px; }
+.jsc-qa-row i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--jsc-green); color: #fff; }
+.is-active .jsc-qa-row { animation: jsc-fade .3s ease both; animation-delay: var(--d); }
+.is-active .jsc-qa-row i { animation: jsc-pop .4s var(--jsc-ease) both; animation-delay: calc(var(--d) + 120ms); }
+
+/* 4 · Track every mile */
+.jsc-map { top: 22px; left: 6%; width: 72%; height: 214px; overflow: hidden; background: #f4f8fb; }
+.jsc-map svg { display: block; width: 100%; height: 100%; }
+.jsc-map-roads path { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; }
+.jsc-map-blocks rect { fill: #e8eff5; }
+.jsc-route-base { fill: none; stroke: #c8d8e6; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1 7; }
+.jsc-route { fill: none; stroke: var(--jsc-indigo); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.jsc-pin-start { fill: #fff; stroke: var(--jsc-indigo); stroke-width: 3; }
+.jsc-courier-dot { fill: var(--jsc-indigo); stroke: #fff; stroke-width: 2.5; }
+.jsc-courier-halo { fill: #0d125126; animation: jsc-halo 1.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes jsc-halo { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+.jsc-map-pin { position: absolute; top: calc(52 / 210 * 100% - 30px); left: calc(300 / 340 * 100% - 15px); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50% 50% 50% 4px; background: var(--jsc-green); color: #fff; box-shadow: 0 8px 18px -6px #1f9d6b99; rotate: -45deg; }
+.jsc-map-pin svg { rotate: 45deg; }
+.jsc-eta { right: 5%; bottom: 20px; width: 52%; padding: 12px 14px 14px; }
+.jsc-eta-head { display: flex; align-items: center; gap: 10px; }
+.jsc-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 12px; }
+.jsc-steps span { position: relative; padding-top: 10px; color: #9aa8b5; font-size: 10.5px; font-weight: 500; }
+.jsc-steps span::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 4px; background: #e6edf3; }
+.jsc-steps .is-done { color: var(--jsc-ink); }
+.jsc-steps .is-done::before { background: var(--jsc-indigo); }
+.jsc-steps .is-live { color: var(--jsc-ink); }
+.jsc-steps .is-live::before { background: linear-gradient(90deg, var(--jsc-indigo) 50%, #e6edf3 50%); background-size: 200% 100%; background-position: 100% 0; }
+.is-active .jsc-steps .is-live::before { animation: jsc-fill 3s ease .6s both; }
+@keyframes jsc-fill { to { background-position: 40% 0; } }
+
+/* 5 · Happy patients */
+.jsc-stack { position: absolute; top: 28px; left: 50%; display: grid; gap: 10px; width: min(340px, 84%); translate: -50% 0; }
+.jsc-note { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #ffffffcc; border-radius: 18px; background: #ffffffe0; box-shadow: 0 1px 2px #0d12510a, 0 16px 34px -20px #244c7e66; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.jsc-note > div { flex: 1; min-width: 0; }
+.jsc-note time { align-self: flex-start; color: #9aa8b5; font-size: 10.5px; }
+.jsc-note-icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 11px; background: var(--jsc-ice); color: var(--jsc-indigo); }
+.jsc-note-green { background: var(--jsc-green-soft); color: var(--jsc-green); }
+.jsc-note-gold { background: #fdf3dc; color: #c4891a; }
+.jsc-stars { display: flex; gap: 2px; margin-top: 4px; color: #e3a62f; }
+.is-active .jsc-stars svg { animation: jsc-pop .35s var(--jsc-ease) both; animation-delay: var(--d); }
+.jsc-note:nth-child(2) { margin-inline: 10px; opacity: .97; }
+.jsc-note:nth-child(3) { margin-inline: 20px; }
+.jsc-follow-chip { left: 50%; bottom: 18px; translate: -50% 0; }
+
+@media (max-width: 800px) {
+  .jsc-stage { flex: none; height: 300px; min-height: 0; }
+}
+@media (max-width: 420px) {
+  .jsc-stage { height: 290px; border-radius: 18px; }
+  .jsc-patient { top: 16px; left: 5%; width: 88%; }
+  .jsc-need-chip { right: 5%; bottom: 66px; }
+  .jsc-form { width: 88%; }
+  .jsc-field { grid-template-columns: 66px 1fr 18px; }
+  .jsc-pedestal { left: 0; width: 46%; }
+  .jsc-badge { right: 4%; padding-right: 10px; }
+  .jsc-badge small { display: none; }
+  .jsc-qa { right: 4%; width: 52%; }
+  .jsc-map { left: 4%; width: 88%; height: 190px; }
+  .jsc-eta { right: 4%; width: 66%; }
+  .jsc-stack { width: 90%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jsc-stage *, .jsc-stage *::before { animation: none !important; transition: none !important; }
+}

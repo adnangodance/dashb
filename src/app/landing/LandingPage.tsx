@@ -6,6 +6,7 @@ import { LandingSection, useLandingSectionMotion } from "./LandingSection";
 import { FooterWordmark } from "./FooterWordmark";
 import { OrderJourney } from "./OrderJourney";
 import { PlatformComparison } from "./PlatformComparison";
+import { QualitySection } from "./QualitySection";
 import { ScrollableTabs } from "../responsive-ui";
 
 import { LandingPartners, LandingCoverage, useLandingCarousel, partnerCount } from "./LandingInteractions";
@@ -44,7 +45,6 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
   }, []);
   useLandingSectionMotion(pageRef);
 
-  const { ref: qualityRef, index: qualityIndex, onScroll: updateQualityIndex, scrollTo: scrollQuality } = useLandingCarousel(6, 0, true);
   const { ref: testimonialRef, index: testimonialIndex, onScroll: updateTestimonialIndex, scrollTo: scrollTestimonial } = useLandingCarousel(3, 22);
 
   function handleLinkClick(event: MouseEvent<HTMLElement>) {
@@ -157,91 +157,7 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
           </article>
         </div>
       </section>
-      <section id="quality" className="slrx-quality-formulations-section">
-        <h2 className="slrx-quality-formulations-heading">
-          <span className="slrx-quality-formulations-heading-line">Pharmacy-grade quality, in every</span>
-          <span className="slrx-quality-formulations-heading-line">formulation your patients need.</span>
-        </h2>
-        <div className="slrx-quality-formulations-cards">
-          <div className="slrx-quality-formulations-clinics-card">
-            <div className="slrx-quality-formulations-card-header">
-              <h3 className="slrx-quality-formulations-card-title">
-                <span className="slrx-quality-formulations-card-title-line">Why clinics</span>
-                <span className="slrx-quality-formulations-card-title-line">choose us</span>
-              </h3>
-              <a className="slrx-quality-formulations-catalog-button" href="?view=sales-catalog">Explore the catalog</a>
-            </div>
-            <ul className="slrx-quality-formulations-points-list">
-              <li className={`slrx-quality-formulations-point-item ${qualityIndex % 5 === 0 ? "slrx-quality-formulations-point-item-active" : ""}`}>
-                <span className="slrx-quality-formulations-point-icon">
-                  <img alt="" aria-hidden="true" loading="lazy" width="12" height="11" decoding="async" src={landingAsset("quality-check-icon.png")} />
-                </span>
-                {"Every sterile batch is checked for purity and freedom from contaminants before it ships"}
-              </li>
-              <li className={`slrx-quality-formulations-point-item ${qualityIndex % 5 === 1 ? "slrx-quality-formulations-point-item-active" : ""}`}>
-                <span className="slrx-quality-formulations-point-icon">
-                  <img alt="" aria-hidden="true" loading="lazy" width="12" height="11" decoding="async" src={landingAsset("quality-check-icon.png")} />
-                </span>
-                {"Ingredients come only from FDA-registered, GMP-certified partners — never the gray market"}
-              </li>
-              <li className={`slrx-quality-formulations-point-item ${qualityIndex % 5 === 2 ? "slrx-quality-formulations-point-item-active" : ""}`}>
-                <span className="slrx-quality-formulations-point-icon">
-                  <img alt="" aria-hidden="true" loading="lazy" width="12" height="11" decoding="async" src={landingAsset("quality-check-icon.png")} />
-                </span>
-                {"Fully aligned with USP <797> and <800> safety standards"}
-              </li>
-              <li className={`slrx-quality-formulations-point-item ${qualityIndex % 5 === 3 ? "slrx-quality-formulations-point-item-active" : ""}`}>
-                <span className="slrx-quality-formulations-point-icon">
-                  <img alt="" aria-hidden="true" loading="lazy" width="12" height="11" decoding="async" src={landingAsset("quality-check-icon.png")} />
-                </span>
-                {"Every medication is independently verified through third-party testing"}
-              </li>
-              <li className={`slrx-quality-formulations-point-item ${qualityIndex % 5 === 4 ? "slrx-quality-formulations-point-item-active" : ""}`}>
-                <span className="slrx-quality-formulations-point-icon">
-                  <img alt="" aria-hidden="true" loading="lazy" width="12" height="11" decoding="async" src={landingAsset("quality-check-icon.png")} />
-                </span>
-                {"A wide range of dosage forms tailored to each patient's treatment plan"}
-              </li>
-            </ul>
-          </div>
-          <div className="slrx-quality-formulations-formulations-card">
-            <div className="slrx-quality-formulations-card-header">
-              <h3 className="slrx-quality-formulations-card-title">
-                <span className="slrx-quality-formulations-card-title-line">Available in multiple</span>
-                <span className="slrx-quality-formulations-card-title-line">formulations</span>
-              </h3>
-              <ScrollableTabs activeKey={qualityIndex} className="slrx-quality-formulations-dots" role="tablist" aria-label="Formulations">
-                <button type="button" role="tab" aria-selected={qualityIndex === 0} aria-label="NAD+ Injection vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 0 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(0)} />
-                <button type="button" role="tab" aria-selected={qualityIndex === 1} aria-label="Testosterone Cypionate vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 1 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(1)} />
-                <button type="button" role="tab" aria-selected={qualityIndex === 2} aria-label="Glutathione vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 2 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(2)} />
-                <button type="button" role="tab" aria-selected={qualityIndex === 3} aria-label="Nandrolone Decanoate vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 3 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(3)} />
-                <button type="button" role="tab" aria-selected={qualityIndex === 4} aria-label="Tri-Mix vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 4 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(4)} />
-                <button type="button" role="tab" aria-selected={qualityIndex === 5} aria-label="Sermorelin vial" className={`slrx-quality-formulations-dot ${qualityIndex >= 5 ? "slrx-quality-formulations-dot-active" : ""}`} onClick={() => scrollQuality(5)} />
-              </ScrollableTabs>
-            </div>
-            <div className="slrx-quality-formulations-slides" ref={qualityRef} onScroll={updateQualityIndex}>
-              <div className="slrx-quality-formulations-slide">
-                <img alt="NAD+ Injection vial" loading="lazy" width="960" height="1280" decoding="async" className="slrx-quality-formulations-slide-image" src={landingAsset("Product-image-1.png")} />
-              </div>
-              <div className="slrx-quality-formulations-slide">
-                <img alt="Testosterone Cypionate vial" loading="lazy" width="960" height="1280" decoding="async" className="slrx-quality-formulations-slide-image" src={landingAsset("Product-image-4.png")} />
-              </div>
-              <div className="slrx-quality-formulations-slide">
-                <img alt="Glutathione vial" loading="lazy" width="480" height="640" decoding="async" className="slrx-quality-formulations-slide-image" src={landingAsset("Product-image-6.png")} />
-              </div>
-              <div className="slrx-quality-formulations-slide">
-                <img alt="Nandrolone Decanoate vial" loading="lazy" width="960" height="1280" decoding="async" className="slrx-quality-formulations-slide-image" src={landingAsset("Product-image-3.png")} />
-              </div>
-              <div className="slrx-quality-formulations-slide">
-                <img alt="Tri-Mix vial" loading="lazy" width="960" height="1280" decoding="async" className="slrx-quality-formulations-slide-image" src={landingAsset("Product-image-2.png")} />
-              </div>
-              <div className="slrx-quality-formulations-slide">
-                <img alt="Sermorelin vial" loading="lazy" width="960" height="1280" decoding="async" className="slrx-quality-formulations-slide-image" src={landingAsset("Product-image-5.png")} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <QualitySection />
       <section id="feedback" className="slrx-testimonials-section">
         <div className="slrx-testimonials-header">
           <h2 className="slrx-testimonials-heading">

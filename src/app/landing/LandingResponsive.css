@@ -5,7 +5,7 @@
 .slrx-hero :is(a, button) { min-height: 44px; }
 .slrx-hero-menu-toggle { width: 44px; flex-shrink: 0; }
 .slrx-hero-account { min-width: 0; }
-.landing-menu-layer { font-family: Inter, sans-serif; }
+.landing-menu-layer { z-index: 60; font-family: Inter, sans-serif; }
 .landing-menu-layer > .slrx-hero-mobile-links {
   position: relative; inset: auto; display: flex; flex-direction: column; gap: 6px;
   width: min(360px, calc(100% - 32px)); max-width: none; height: 100dvh; max-height: 100dvh;
