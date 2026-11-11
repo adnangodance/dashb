@@ -1,4 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
 import { landingAsset } from "./assets";
 import testosteroneCypionate from "../../assets/landing-reference/testosterone-cypionate-503b.png";
 import testosteroneCypionatePropionate from "../../assets/landing-reference/testosterone-cypionate-propionate-503b.png";
@@ -16,7 +15,6 @@ export function InjectionFeatures() {
             <img className="injection-feature-vial injection-feature-vial-back" src={landingAsset("Product-image-6.png")} alt="Glutathione vial" loading="lazy" decoding="async" width="480" height="640" />
             <img className="injection-feature-vial injection-feature-vial-front" src={landingAsset("Product-image-2.png")} alt="Tri-Mix vial" loading="lazy" decoding="async" width="960" height="1280" />
           </div>
-          <a className="injection-feature-link" href="?view=sales-catalog">Explore the catalog <ArrowUpRight size={16} aria-hidden="true" /></a>
         </article>
         <article className="injection-feature-card injection-feature-practice" aria-labelledby="injection-503b-title">
           <span className="injection-feature-category">503B</span>
@@ -28,7 +26,6 @@ export function InjectionFeatures() {
           <div className="injection-card-model injection-practice-vial-main">
             <img className="injection-practice-vial-image" src={testosteroneCypionatePropionate} alt="Testosterone Cypionate / Propionate vial" loading="lazy" decoding="async" width="423" height="581" />
           </div>
-          <a className="injection-feature-link" href="?view=sales-catalog">Explore the catalog <ArrowUpRight size={16} aria-hidden="true" /></a>
         </article>
       </div>
     </section>

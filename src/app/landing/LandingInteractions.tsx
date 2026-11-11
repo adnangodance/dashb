@@ -100,25 +100,13 @@ export function LandingPartners() {
         </filter>
       </defs>
     </svg>
-    <div className="slrx-trust-panel">
-      <div className="slrx-trust-pharmacies">
-        <h2 id="slrx-trust-heading">Trusted by leading compounding pharmacies</h2>
-        <div className="slrx-trust-viewport" tabIndex={0} role="region" aria-label="Partner pharmacy logos">
-          <div className="slrx-trust-track" style={{ animationPlayState: active ? "running" : "paused" }}>
-            {[false, true].map(duplicate => <div key={String(duplicate)} className={`slrx-trust-logo-group${duplicate ? " slrx-trust-logo-group-copy" : ""}`} aria-hidden={duplicate || undefined}>
-              {partners.map(partner => <div className="slrx-trust-logo-slot" key={partner.image}><PartnerLogo partner={partner} duplicate={duplicate} /></div>)}
-            </div>)}
-          </div>
-        </div>
+    <h2 id="slrx-trust-heading">Trusted by leading compounding pharmacies</h2>
+    <div className="slrx-trust-viewport" tabIndex={0} role="region" aria-label="Partner pharmacy logos">
+      <div className="slrx-trust-track" style={{ animationPlayState: active ? "running" : "paused" }}>
+        {[false, true].map(duplicate => <div key={String(duplicate)} className={`slrx-trust-logo-group${duplicate ? " slrx-trust-logo-group-copy" : ""}`} aria-hidden={duplicate || undefined}>
+          {partners.map(partner => <div className="slrx-trust-logo-slot" key={partner.image}><PartnerLogo partner={partner} duplicate={duplicate} /></div>)}
+        </div>)}
       </div>
-      <dl className="slrx-trust-facts">
-        {[
-          { value: String(partnerCount), label: "Partner pharmacies" },
-          { value: "503A", label: "Patient prescriptions" },
-          { value: "503B", label: "Office-use supply" },
-          { value: "1", label: "Connected platform" },
-        ].map(fact => <div key={fact.label} className="slrx-trust-fact"><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}
-      </dl>
     </div>
     <p className="slrx-trust-disclaimer">Logos and trademarks are the property of their respective owners.</p>
   </section>;

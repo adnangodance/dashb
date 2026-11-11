@@ -8,7 +8,7 @@ import "./InjectionSection.css";
 export function InjectionSection() {
   return <section className="injection-experience" id="care-in-motion" aria-labelledby="injection-title">
     <header className="injection-heading">
-      <h2 id="injection-title">503A &amp; 503B products.<br/>For your patients and your practice.</h2>
+      <h1 id="injection-title">Your <em>compounding network.</em><br/>All in one platform.</h1>
     </header>
     <div className="injection-editorial-hero">
       <svg className="injection-editorial-arc" viewBox="0 0 1600 560" preserveAspectRatio="none" aria-hidden="true" focusable="false">
@@ -25,8 +25,8 @@ export function InjectionSection() {
         </g>)}
       </svg>
       <div className="injection-editorial-art">
-        <img className="injection-editorial-bottle injection-editorial-bottle-back" src={tesamorelinIpamorelinVial} alt="Tesamorelin / Ipamorelin vial" width="480" height="640" loading="lazy" decoding="async" />
-        <img className="injection-editorial-bottle injection-editorial-bottle-front" src={nadInjectionVial} alt="Nicotinamide Adenine Dinucleotide (NAD+) injection vial" width="916" height="1142" loading="lazy" decoding="async" />
+        <img className="injection-editorial-bottle injection-editorial-bottle-back" src={tesamorelinIpamorelinVial} alt="Tesamorelin / Ipamorelin vial" width="480" height="640" decoding="async" />
+        <img className="injection-editorial-bottle injection-editorial-bottle-front" src={nadInjectionVial} alt="Nicotinamide Adenine Dinucleotide (NAD+) injection vial" width="916" height="1142" decoding="async" />
       </div>
       <div className="injection-editorial-actions">
         <a className="injection-editorial-start" href="?view=register">Get started</a>

@@ -3,7 +3,6 @@ import { Star } from "lucide-react";
 import { landingAsset } from "./assets";
 import { LandingHero } from "./LandingHero";
 import { LandingSection, useLandingSectionMotion } from "./LandingSection";
-import { InjectionSection } from "./InjectionSection";
 import { FooterWordmark } from "./FooterWordmark";
 import { OrderJourney } from "./OrderJourney";
 import { PlatformComparison } from "./PlatformComparison";
@@ -70,11 +69,8 @@ export function LandingPage({ onLoginClick, onRegisterClick, onRequestDemoClick,
           if (actions[href]) { actions[href](); window.scrollTo(0, 0); }
           else requestAnimationFrame(() => document.getElementById(href.slice(1))?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
         }} />
-        <LandingPartners />
       </div>
-      <LandingSection>
-        <InjectionSection />
-      </LandingSection>
+      <LandingPartners />
       <LandingSection tone="journey">
         <OrderJourney />
       </LandingSection>
